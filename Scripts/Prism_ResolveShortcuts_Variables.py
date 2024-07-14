@@ -49,7 +49,7 @@ import os
 
 class Prism_ResolveShortcuts_Variables(object):
     def __init__(self, core, plugin):
-        self.version = "v2.0.8-0.1"
+        self.version = "v2.0.8-0.2"
         self.pluginName = "Resolve Shortcuts"
         self.pluginType = "Custom"
         self.platforms = ["Windows", "Linux", "Darwin"]
