@@ -37,11 +37,14 @@ For Each line In lines
         Select Case Trim(keyValue(0))
             Case "python_exe_path"
                 pythonExe = Trim(keyValue(1))
-            Case "script_path"
-                scriptPath = Trim(keyValue(1))
+            Case "plugin_path"
+                pluginPath = Trim(keyValue(1))
         End Select
     End If
 Next
+
+' Construct the full script path
+scriptPath = pluginPath & "\Scripts\DvResolve_Project_Shortcuts.py"
 
 Set objShell = CreateObject("WScript.Shell")
 

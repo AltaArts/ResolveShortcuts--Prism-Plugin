@@ -174,8 +174,9 @@ class ResolveProjectShortcuts(object):
             projectPath = "\\".join(parentFolders) + "\\" + currProjectName
 
             projectPath = dbName + "\\" + projectPath
+            projectPath = projectPath.replace("\\\\", "\\")
 
-            return projectPath
+            return currProjectName, projectPath
 
         except Exception as e:
             print("Error:", e)
@@ -184,7 +185,7 @@ class ResolveProjectShortcuts(object):
 
     def saveProjectShortcut(self, savePath):
 
-        projectPath = self.getProjectPath()
+        currProjectName, projectPath = self.getProjectPath()
 
         templateFile = os.path.join(self.pluginPath,
                                     "Scripts",
@@ -204,13 +205,13 @@ class ResolveProjectShortcuts(object):
             with open(savePath, 'w') as file:
                 file.write(modifiedContent)
 
-            result = f"Shortcut saved successfully to: {savePath}"
+            result = f"Saved shortcut to {currProjectName}"
 
         except Exception as e:
             result = f"Error while saving shortcut: {e}"
-        
-        return result
 
+        
+        return currProjectName, result
 
 
 
