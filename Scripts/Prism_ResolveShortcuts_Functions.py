@@ -307,8 +307,6 @@ class Prism_ResolveShortcuts_Functions(object):
         except Exception as e:
             self.core.popup("Failed")
         
-        # self.core.prismSettings(restart=True, reload_module=True)
-
 
     @err_catcher(name=__name__)
     def removeEnviroVar(self):
@@ -327,8 +325,6 @@ class Prism_ResolveShortcuts_Functions(object):
 
         except Exception as e:
             self.core.popup("Failed")
-
-        # self.core.prismSettings(restart=True, reload_module=True)
 
 
     @err_catcher(name=__name__)
