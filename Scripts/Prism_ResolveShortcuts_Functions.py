@@ -52,12 +52,10 @@ import subprocess
 from qtpy.QtCore import *
 from qtpy.QtGui import *
 from qtpy.QtWidgets import *
-from qtpy.QtCore import Signal
-
 
 from PrismUtils.Decorators import err_catcher_plugin as err_catcher
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)                #   TODO  add logging
 
 
 
@@ -66,28 +64,67 @@ class Prism_ResolveShortcuts_Functions(object):
         self.core = core
         self.plugin = plugin
 
-        self.resolvePlugin = self.core.getPlugin("Resolve")                     #   TODO
+        self.resolvePlugin = self.core.getPlugin("Resolve")                     #   TODO    NEEDED???
 
         #   Global Settings File
         self.pluginLocation = os.path.dirname(os.path.dirname(__file__))
-        self.settingsFile = os.path.join(self.pluginLocation, "ResolveShortcuts_Config.json")
+        self.settingsFile = os.path.join(self.pluginLocation, "ResolveShortcuts_Config.txt")
 
         #   Callbacks
         logger.debug("Loading callbacks")
         self.core.registerCallback("userSettings_loadUI", self.userSettings_loadUI, plugin=self, priority=40)
-        # self.core.registerCallback("onUserSettingsSave", self.saveSettings, plugin=self)
+        self.core.registerCallback("onUserSettingsSave", self.saveSettings, plugin=self)
 
+        #   Add RCL menu item only in Resolve
         if self.core.appPlugin.pluginName == "Resolve":
             self.core.registerCallback("openPBFileContextMenu", self.addShortcutItem, plugin=self)
 
-        # if self.plugin.pluginName == "Standalone":                #   TODO NEEDED ???
-        # self.setEnviroVars()
+        self.loadSettings()
+
 
 
     # if returns true, the plugin will be loaded by Prism
     @err_catcher(name=__name__)
     def isActive(self):
         return True
+
+    #   Load settings from plain text file due to using .vbs for the shortcut file.
+    @err_catcher(name=__name__)
+    def loadSettings(self):
+
+                                                            #   TODO  IF FILE CORRUPT OR DOES NOT EXIST
+
+        self.configData = {}
+        if os.path.isfile(self.settingsFile):
+            with open(self.settingsFile, 'r') as file:
+                for line in file:
+                    line = line.strip()
+                    if '=' in line:
+                        key, value = line.split('=', 1)
+                        self.configData[key.strip()] = value.strip()
+        else:
+            logger.warning(f"Settings file {self.settingsFile} not found.")
+
+    #   Save settings to plain text file due to using .vbs for the shortcut file.
+    @err_catcher(name=__name__)
+    def saveSettings(self, origin):
+        pData = {
+            "python_exe_path": self.e_prismPython.text(),
+            "plugin_path": self.e_pluginLoc.text(),
+            "dvr_script_path": self.e_resolveApiScript.text(),
+            "resolve_exe": self.e_resolveEXE.text(),
+            "shortcuts_enabled": str(self.chb_enableShortcutFunctions.isChecked())
+            }
+
+        try:
+            with open(self.settingsFile, 'w') as file:
+                for key, value in pData.items():
+                    file.write(f"{key}={value}\n")
+            logger.info(f"Settings saved to {self.settingsFile}")
+
+        except Exception as e:
+            logger.error(f"Failed to save settings to {self.settingsFile}: {e}")
+
 
 
     # #   Called with Callback
@@ -236,6 +273,54 @@ class Prism_ResolveShortcuts_Functions(object):
         # Add an expanding spacer at the bottom
         lo_resolveShortcuts.addItem(expanding_Vspacer)
 
+        #   Tooltips
+        tip = "Globally enable the Resolve Shortcuts functionality."
+        self.chb_enableShortcutFunctions.setToolTip(tip)
+
+        tip = ("Status of the system environment variable (DVR_shortcuts_path).\n"
+               "The enviro variable must be set to use the shortcut functions." )
+        l_enviroVarSet.setToolTip(tip)
+        self.l_enviroStatus.setToolTip(tip)
+
+        tip = ("Add the required system environment variable.\n"
+               "Prism will automatically exit and must be manually restarted.")
+        self.but_setEnviroVar.setToolTip(tip)
+
+        tip = ("Remove the system environment variable.\n"
+               "Prism will automatically exit and must be manually restarted.")
+        self.but_removeEnviroVar.setToolTip(tip)
+
+        tip = ("Location of Davinci Resolve's main executable.\n\n"
+               "Should be automantically set during plugin load.")
+        l_resolveExecutable.setToolTip(tip)
+        self.e_resolveEXE.setToolTip(tip)
+        but_browseResolveEXE.setToolTip(tip)
+
+        tip = ("Location of the Resolve API script that is included\n"
+               "with Davinci Resolve.\n"
+               "(DaVinciResolveScript.py)\n\n"
+               "Should be automantically set during plugin load.")
+        l_dvrScriptPath.setToolTip(tip)
+        self.e_resolveApiScript.setToolTip(tip)
+        but_browseResolveApiScript.setToolTip(tip)
+
+        tip = ("Location of Prism's Python executable (python.exe)\n"
+               "Note:  Other python3 exe's might work.\n\n"
+               "Should be automantically set during plugin load.")
+        l_prismPython.setToolTip(tip)
+        self.e_prismPython.setToolTip(tip)
+        but_browsePrismPython.setToolTip(tip)
+
+        tip = ("Location of Resolve Shortcuts plugin directory.\n\n"
+               "Should be automantically set during plugin load.")
+        l_pluginLoc.setToolTip(tip)
+        self.e_pluginLoc.setToolTip(tip)
+
+        tip = "Force regeneration of the default paths."
+        l_reset.setToolTip(tip)
+        but_reset.setToolTip(tip)
+
+        self.loadValues()
         self.refreshUI()
 
         self.chb_enableShortcutFunctions.toggled.connect(self.refreshUI)
@@ -244,6 +329,34 @@ class Prism_ResolveShortcuts_Functions(object):
         origin.addTab(origin.w_resolveShortcuts, "Resolve Shortcuts")
 
 
+    @err_catcher(name=__name__)
+    def loadValues(self):
+
+        if "resolve_exe" in self.configData:
+            self.e_resolveEXE.setText(self.configData["resolve_exe"])
+
+        if "dvr_script_path" in self.configData:
+            self.e_resolveApiScript.setText(self.configData["dvr_script_path"])
+
+        if "python_exe_path" in self.configData:
+            self.e_prismPython.setText(self.configData["python_exe_path"])
+
+        if "plugin_path" in self.configData:
+            self.e_pluginLoc.setText(self.configData["plugin_path"])
+
+        if "shortcuts_enabled" in self.configData:
+            if self.configData["shortcuts_enabled"] == "True":
+                checked = True
+            else:
+                checked = False
+            self.chb_enableShortcutFunctions.setChecked(checked)
+
+
+
+
+
+
+    #   File browser
     @err_catcher(name=__name__)
     def browseFiles(self, target, type='file', title='Select File or Folder'):
         options = QFileDialog.Options()
@@ -263,7 +376,6 @@ class Prism_ResolveShortcuts_Functions(object):
 
     @err_catcher(name=__name__)
     def refreshUI(self, *args):
-
         set = self.checkEnviroVar()
 
         if set:
@@ -281,7 +393,6 @@ class Prism_ResolveShortcuts_Functions(object):
             self.gb_resolveConfig.setEnabled(True)
         else:
             self.gb_resolveConfig.setEnabled(False)
-
         
 
     @err_catcher(name=__name__)
@@ -292,12 +403,12 @@ class Prism_ResolveShortcuts_Functions(object):
     @err_catcher(name=__name__)
     def setEnviroVar(self):
         try:
-            text = ("Prism will need to shutdown for the enviroment\n"
+            text = ("Prism will need to shutdown for the environment\n"
                     "variable to be set.  Afterwards you will need to\n"
                      "manually restart Prism.\n\n"
                      "Do you want to set the variable?"
                      )
-            title = "Set Enviroment Variable"
+            title = "Set Environment Variable"
             result = self.core.popupQuestion(text=text, title=title)
 
             if result == "Yes":
@@ -311,12 +422,12 @@ class Prism_ResolveShortcuts_Functions(object):
     @err_catcher(name=__name__)
     def removeEnviroVar(self):
         try:
-            text = ("Prism will need to shutdown for the enviroment\n"
+            text = ("Prism will need to shutdown for the environment\n"
                     "variable to be set.  Afterwards you will need to\n"
                      "manually restart Prism.\n\n"
                      "Do you want to set the variable?"
                      )
-            title = "Set Enviroment Variable"
+            title = "Set Environment Variable"
             result = self.core.popupQuestion(text=text, title=title)
 
             if result == "Yes":
@@ -335,29 +446,22 @@ class Prism_ResolveShortcuts_Functions(object):
 
     @err_catcher(name=__name__)
     def addShortcutItem(self, origin, rcmenu, filePath):
-
         #   Adds Right Click Item
         shortcutAct = QAction("Save Shortcut to Resolve Project", rcmenu)
         shortcutAct.triggered.connect(lambda: self.saveShortcut(origin))
         rcmenu.addAction(shortcutAct)
 
 
-
     @err_catcher(name=__name__)
     def saveShortcut(self, origin):
-
         try:
             from DvResolve_Project_Shortcuts import ResolveProjectShortcuts
         except Exception as e:
             self.core.popup("Failed")
-
         
         entity = origin.getCurrentEntity()
         curDep = origin.getCurrentDepartment()
         curTask = origin.getCurrentTask()
-
-
-
         savePath = origin.core.generateScenePath(entity=entity,
                                                  department=curDep,
                                                  task=curTask,
@@ -367,24 +471,17 @@ class Prism_ResolveShortcuts_Functions(object):
                                                  )
 
 
-
-
         #   TODO Thumbnail
 
 
         shortcuts = ResolveProjectShortcuts()
         currProjectName, result = shortcuts.saveProjectShortcut(savePath)
 
-
-        description = f'Shortcut to   "{currProjectName}"   Resolve project'
-
         detailData = {}
-        detailData["description"] = description
+        detailData["description"] = f'Shortcut to   "{currProjectName}"   Resolve project'
 
         origin.core.saveSceneInfo(savePath, detailData, preview=None)
 
         origin.refreshScenefiles()
 
         self.core.popup(result)
-
-
