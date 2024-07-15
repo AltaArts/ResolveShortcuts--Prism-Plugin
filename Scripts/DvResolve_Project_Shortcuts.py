@@ -167,10 +167,14 @@ class ResolveProjectShortcuts(object):
         if currDbName != projectDB:
             print("Incorrect Resolve Database selected")
             return
+
+        try: 
+            currProjectName = self.pm.GetCurrentProject().GetName()
+            if currProjectName != "Untitled Project":
+                self.pm.SaveProject()
+        except AttributeError:
+            pass
         
-        currProject = self.pm.GetCurrentProject()
-        if currProject:
-            self.pm.SaveProject()
         
         self.pm.GotoRootFolder()
         
@@ -282,3 +286,10 @@ if __name__ == "__main__":
         savePath = args.path
 
         resolveShortcuts.saveProjectShortcut(savePath)
+
+
+    # projectPath = "db_c0a5659ba25442149ff8b6775a4be99f\Random Practice\Tears of Steal_v002"
+
+    # resolveShortcuts = ResolveProjectShortcuts()
+
+    # resolveShortcuts.openResolveProject(projectPath, timeout=30)
