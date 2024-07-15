@@ -1,5 +1,50 @@
-
-######      TODO     ADD HEADER
+# -*- coding: utf-8 -*-
+#
+####################################################
+#
+# PRISM - Pipeline for animation and VFX projects
+#
+# www.prism-pipeline.com
+#
+# contact: contact@prism-pipeline.com
+#
+####################################################
+#
+#
+# Copyright (C) 2016-2023 Richard Frangenberg
+# Copyright (C) 2023 Prism Software GmbH
+#
+# Licensed under GNU LGPL-3.0-or-later
+#
+# This file is part of Prism.
+#
+# Prism is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Prism is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with Prism.  If not, see <https://www.gnu.org/licenses/>.
+#
+####################################################
+####################################################
+#
+#         RESOLVE SHORTCUTS PLUGIN
+#           by Joshua Breckeen
+#                Alta Arts
+#
+#   A PlugIn that adds the ability to save a shortcut to a project that
+#   is located in the Resolve database.  This will create a .vbs file that contains
+#   the project path, and simple code to start Resolve and navigate to the project.
+#   Prism's ProjectBrowser launched from Resolve will contain a right-click menu
+#   item to save the shortcut.
+#
+####################################################
 
 import sys
 import os
@@ -19,7 +64,7 @@ class ResolveProjectShortcuts(object):
 
         self.resolveExe, dvr_script_path = self.loadSettings()
 
-        # Add the Resolve script path to sys.path
+        # Add the Resolve API script to sys.path
         sys.path.append(dvr_script_path)
 
 
@@ -47,8 +92,11 @@ class ResolveProjectShortcuts(object):
             return resolveEXE, dvr_script_path
 
         except FileNotFoundError:
-            print(f"Error: Configuration file '{self.settingsFile}' not found.")
+            print(f"ERROR: Configuration file '{self.settingsFile}' not found.")
             return None
+        
+        except Exception as e:
+            print("ERROR: Config file formatting error.")
 
 
     def startResolve(self, timeout=30):
@@ -94,57 +142,56 @@ class ResolveProjectShortcuts(object):
 
     def openResolveProject(self, projectLoadPath, timeout):
             
-            self.startResolve(timeout)
+        self.startResolve(timeout)
 
-            if not self.resolve:
-                return
+        if not self.resolve:
+            return
 
-            if len(projectLoadPath) < 2:
-                print("Invalid project path format.")
-                return
-            
-            # Get the project manager
-            self.pm = self.resolve.GetProjectManager()
-            currDbName = self.pm.GetCurrentDatabase()["DbName"]
+        if len(projectLoadPath) < 2:
+            print("Invalid project path format.")
+            return
+        
+        # Get the project manager
+        self.pm = self.resolve.GetProjectManager()
+        currDbName = self.pm.GetCurrentDatabase()["DbName"]
 
-            path_components = projectLoadPath.split("\\")
+        path_components = projectLoadPath.split("\\")
 
-            if len(path_components) < 2:
-                print("Invalid project path format.")
-                return
-            
-            projectDB = path_components[0]
-            projectPath = "\\".join(path_components[1:])
+        if len(path_components) < 2:
+            print("Invalid project path format.")
+            return
+        
+        projectDB = path_components[0]
+        projectPath = "\\".join(path_components[1:])
 
-            if currDbName != projectDB:
-                print("Incorrect Resolve Database selected")
-                return
-            
-            currProject = self.pm.GetCurrentProject()
-            if currProject:
-                self.pm.SaveProject()
-            
+        if currDbName != projectDB:
+            print("Incorrect Resolve Database selected")
+            return
+        
+        currProject = self.pm.GetCurrentProject()
+        if currProject:
+            self.pm.SaveProject()
+        
+        self.pm.GotoRootFolder()
+        
+        folders = projectPath.split("\\")
+        projectName = folders[-1]
+        folderPath = "\\".join(folders[:-1])
+
+        # Navigate to the folder path
+        if folderPath:
             self.pm.GotoRootFolder()
-            
-            folders = projectPath.split("\\")
-            projectName = folders[-1]
-            folderPath = "\\".join(folders[:-1])
+            for folderName in folderPath.split("\\"):
+                if folderName.strip():
+                    if not self.pm.OpenFolder(folderName):
+                        print(f"Failed to open folder: {folderName}")
+                        return
 
-            # Navigate to the folder path
-            if folderPath:
-                self.pm.GotoRootFolder()
-                for folderName in folderPath.split("\\"):
-                    if folderName.strip():
-                        if not self.pm.OpenFolder(folderName):
-                            print(f"Failed to open folder: {folderName}")
-                            return
-
-            # Load the project
-            if not self.pm.LoadProject(projectName):
-                print(f"Failed to load project: {projectName}")
-            else:
-                print(f"Project {projectName} loaded successfully.")
-
+        # Load the project
+        if not self.pm.LoadProject(projectName):
+            print(f"Failed to load project: {projectName}")
+        else:
+            print(f"Project {projectName} loaded successfully.")
 
 
     def getProjectPath(self):
@@ -184,7 +231,6 @@ class ResolveProjectShortcuts(object):
 
 
     def saveProjectShortcut(self, savePath):
-
         currProjectName, projectPath = self.getProjectPath()
 
         templateFile = os.path.join(self.pluginPath,
@@ -192,7 +238,6 @@ class ResolveProjectShortcuts(object):
                                     "Template",
                                     "shortcutTemplate.vbs"
                                     )
-
         try:
             # Read the template file
             with open(templateFile, 'r') as file:
@@ -209,10 +254,8 @@ class ResolveProjectShortcuts(object):
 
         except Exception as e:
             result = f"Error while saving shortcut: {e}"
-
         
         return currProjectName, result
-
 
 
 if __name__ == "__main__":
@@ -227,7 +270,6 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
 
-
     resolveShortcuts = ResolveProjectShortcuts()
 
     if args.mode == "load":
@@ -235,28 +277,8 @@ if __name__ == "__main__":
 
         # Call the function to load the project in Resolve with a timeout of 30 seconds
         resolveShortcuts.openResolveProject(projectPath, timeout=30)
-        
 
     elif args.mode == "save":
-
         savePath = args.path
 
         resolveShortcuts.saveProjectShortcut(savePath)
-
-
-
-
-### TESTING
-
-    # projectPath = "db_c0a5659ba25442149ff8b6775a4be99f\Testing\Sub 1\Sub 2\ShortCutTests"
-    # savePath = r"N:\Data\Projects\Random Practice\01_Production\Shots\090_TearsOfSteel\010_DollyInManSitting\Scenefiles\resolve\Comp\090_TearsOfSteel-010_DollyInManSitting_Comp_v002"
-
-    # resolveShortcuts = ResolveProjectShortcuts()
-
-    # resolveShortcuts.openResolveProject(projectPath, timeout=30)
-    
-    # returnPath = resolveShortcuts.saveProjectShortcut(savePath)
-
-    # print(returnPath)
-
-

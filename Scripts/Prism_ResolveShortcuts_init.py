@@ -38,8 +38,11 @@
 #           by Joshua Breckeen
 #                Alta Arts
 #
-#   This PlugIn adds an additional tab to the Prism Settings menu to 
-#   allow a user to choose a directory that contains scene presets.                 #   TODO
+#   A PlugIn that adds the ability to save a shortcut to a project that
+#   is located in the Resolve database.  This will create a .vbs file that contains
+#   the project path, and simple code to start Resolve and navigate to the project.
+#   Prism's ProjectBrowser launched from Resolve will contain a right-click menu
+#   item to save the shortcut.
 #
 ####################################################
 

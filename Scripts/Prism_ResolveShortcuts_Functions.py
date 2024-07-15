@@ -38,9 +38,11 @@
 #           by Joshua Breckeen
 #                Alta Arts
 #
-#   This PlugIn adds the ability to save a shortcut to a project that
+#   A PlugIn that adds the ability to save a shortcut to a project that
 #   is located in the Resolve database.  This will create a .vbs file that contains
 #   the project path, and simple code to start Resolve and navigate to the project.
+#   Prism's ProjectBrowser launched from Resolve will contain a right-click menu
+#   item to save the shortcut.
 #
 ####################################################
 
@@ -63,24 +65,25 @@ class Prism_ResolveShortcuts_Functions(object):
     def __init__(self, core, plugin):
         self.core = core
         self.plugin = plugin
+        self.shortcutsEnabled = False
+        self.useIcon = False
 
-        self.resolvePlugin = self.core.getPlugin("Resolve")                     #   TODO    NEEDED???
+        # self.resolvePlugin = self.core.getPlugin("Resolve")                     #   TODO    NEEDED???
 
-        #   Global Settings File
+        #   Settings File
         self.pluginLocation = os.path.dirname(os.path.dirname(__file__))
         self.settingsFile = os.path.join(self.pluginLocation, "ResolveShortcuts_Config.txt")
+
+        self.loadSettings()
 
         #   Callbacks
         logger.debug("Loading callbacks")
         self.core.registerCallback("userSettings_loadUI", self.userSettings_loadUI, plugin=self, priority=40)
         self.core.registerCallback("onUserSettingsSave", self.saveSettings, plugin=self)
-
+        self.core.registerCallback("getIconPathForFileType", self.setIcon, plugin=self)
         #   Add RCL menu item only in Resolve
         if self.core.appPlugin.pluginName == "Resolve":
             self.core.registerCallback("openPBFileContextMenu", self.addShortcutItem, plugin=self)
-
-        self.loadSettings()
-
 
 
     # if returns true, the plugin will be loaded by Prism
@@ -88,22 +91,46 @@ class Prism_ResolveShortcuts_Functions(object):
     def isActive(self):
         return True
 
+
+    @err_catcher(name=__name__)
+    def setIcon(self, extension):
+        if self.shortcutsEnabled and self.useIcon:
+            if extension == ".vbs":
+                icon = os.path.join(self.pluginLocation, "UserInterfaces", "ResolveShortcuts.ico")
+                return icon
+
+        return None
+
+
     #   Load settings from plain text file due to using .vbs for the shortcut file.
     @err_catcher(name=__name__)
     def loadSettings(self):
 
                                                             #   TODO  IF FILE CORRUPT OR DOES NOT EXIST
 
-        self.configData = {}
         if os.path.isfile(self.settingsFile):
+            self.configData = {}
             with open(self.settingsFile, 'r') as file:
                 for line in file:
                     line = line.strip()
                     if '=' in line:
                         key, value = line.split('=', 1)
                         self.configData[key.strip()] = value.strip()
+
+            if "shortcuts_enabled" in self.configData:
+                if self.configData["shortcuts_enabled"] == "True":
+                    self.shortcutsEnabled = True
+                else:
+                    self.shortcutsEnabled = False
+
+            if "use_icon" in self.configData:
+                if self.configData["use_icon"] == "True":
+                    self.useIcon = True
+                else:
+                    self.useIcon = False
         else:
             logger.warning(f"Settings file {self.settingsFile} not found.")
+
 
     #   Save settings to plain text file due to using .vbs for the shortcut file.
     @err_catcher(name=__name__)
@@ -113,7 +140,8 @@ class Prism_ResolveShortcuts_Functions(object):
             "plugin_path": self.e_pluginLoc.text(),
             "dvr_script_path": self.e_resolveApiScript.text(),
             "resolve_exe": self.e_resolveEXE.text(),
-            "shortcuts_enabled": str(self.chb_enableShortcutFunctions.isChecked())
+            "shortcuts_enabled": str(self.chb_enableShortcutFunctions.isChecked()),
+            "use_icon": str(self.chb_useIcon.isChecked())
             }
 
         try:
@@ -124,7 +152,6 @@ class Prism_ResolveShortcuts_Functions(object):
 
         except Exception as e:
             logger.error(f"Failed to save settings to {self.settingsFile}: {e}")
-
 
 
     # #   Called with Callback
@@ -139,8 +166,6 @@ class Prism_ResolveShortcuts_Functions(object):
 
         # Make Spacers
         fixed_20_Vspacer = QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed)
-        fixed_30_Vspacer = QSpacerItem(20, 30, QSizePolicy.Minimum, QSizePolicy.Fixed)
-        fixed_40_Vspacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Fixed)
         expanding_Vspacer = QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding)
         fixed_60_Hspacer = QSpacerItem(60, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
         expanding_Hspacer = QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
@@ -168,6 +193,8 @@ class Prism_ResolveShortcuts_Functions(object):
         self.but_removeEnviroVar = QPushButton("Remove")
         self.but_removeEnviroVar.clicked.connect(self.removeEnviroVar)
         lo_topBar.addWidget(self.but_removeEnviroVar)
+
+        lo_topBar.addItem(fixed_60_Hspacer)
 
         lo_resolveShortcuts.addLayout(lo_topBar)
 
@@ -244,7 +271,10 @@ class Prism_ResolveShortcuts_Functions(object):
         lo_pluginLoc.addWidget(self.e_pluginLoc)
 
         but_browsePluginLoc = QPushButton("Browse")
-        but_browsePluginLoc.clicked.connect(lambda: self.browseFiles(target=self.e_pluginLoc, type="folder", title="Select Shortcuts Plugin Directory"))
+        but_browsePluginLoc.clicked.connect(lambda: self.browseFiles(target=self.e_pluginLoc, 
+                                                                     type="folder", 
+                                                                     title="Select Shortcuts Plugin Directory"
+                                                                     ))
         lo_pluginLoc.addWidget(but_browsePluginLoc)
         lo_resolveConfig.addLayout(lo_pluginLoc)
 
@@ -255,18 +285,22 @@ class Prism_ResolveShortcuts_Functions(object):
         lo_resolveConfig.addItem(fixed_20_Vspacer)
 
 
-        # RESET SECTION
-        lo_reset = QHBoxLayout()
-        lo_reset.addItem(expanding_Hspacer)
+        # BOTTOM BAR
+        lo_btmBar = QHBoxLayout()
+
+        self.chb_useIcon = QCheckBox("Associate Icon with shortcut filetype")
+        lo_btmBar.addWidget(self.chb_useIcon)
+
+        lo_btmBar.addItem(expanding_Hspacer)
 
         l_reset = QLabel("Reset Locations to default:  ")
-        lo_reset.addWidget(l_reset)
+        lo_btmBar.addWidget(l_reset)
 
         but_reset = QPushButton("Reset")
         but_reset.clicked.connect(self.resetPaths)
-        lo_reset.addWidget(but_reset)
-        lo_reset.addItem(fixed_60_Hspacer)
-        lo_resolveConfig.addLayout(lo_reset)
+        lo_btmBar.addWidget(but_reset)
+        lo_btmBar.addItem(fixed_60_Hspacer)
+        lo_resolveConfig.addLayout(lo_btmBar)
 
         lo_resolveShortcuts.addWidget(self.gb_resolveConfig)
 
@@ -316,10 +350,14 @@ class Prism_ResolveShortcuts_Functions(object):
         l_pluginLoc.setToolTip(tip)
         self.e_pluginLoc.setToolTip(tip)
 
+        tip = "Associate custom icon to shortcut scenefiles (.vbs)"
+        self.chb_useIcon.setToolTip(tip)
+
         tip = "Force regeneration of the default paths."
         l_reset.setToolTip(tip)
         but_reset.setToolTip(tip)
 
+        self.loadSettings()
         self.loadValues()
         self.refreshUI()
 
@@ -344,16 +382,8 @@ class Prism_ResolveShortcuts_Functions(object):
         if "plugin_path" in self.configData:
             self.e_pluginLoc.setText(self.configData["plugin_path"])
 
-        if "shortcuts_enabled" in self.configData:
-            if self.configData["shortcuts_enabled"] == "True":
-                checked = True
-            else:
-                checked = False
-            self.chb_enableShortcutFunctions.setChecked(checked)
-
-
-
-
+        self.chb_enableShortcutFunctions.setChecked(self.shortcutsEnabled)
+        self.chb_useIcon.setChecked(self.useIcon)
 
 
     #   File browser
@@ -363,9 +393,18 @@ class Prism_ResolveShortcuts_Functions(object):
         options |= QFileDialog.ReadOnly
 
         if type == 'file':
-            filePath, _ = QFileDialog.getOpenFileName(None, title, "", "All Files (*);;Python Files (*.py)", options=options)
+            filePath, _ = QFileDialog.getOpenFileName(None,
+                                                      title,
+                                                      "",
+                                                      "All Files (*);;Python Files (*.py)",
+                                                      options=options
+                                                      )
         elif type == 'folder':
-            filePath = QFileDialog.getExistingDirectory(None, title, "", options=options)
+            filePath = QFileDialog.getExistingDirectory(None,
+                                                        title,
+                                                        "",
+                                                        options=options
+                                                        )
         else:
             print("Invalid type specified. Use 'file' or 'folder'.")
             return
@@ -440,16 +479,20 @@ class Prism_ResolveShortcuts_Functions(object):
 
     @err_catcher(name=__name__)
     def resetPaths(self):
+
+        #   TODO
+
         pass
  
 
-
     @err_catcher(name=__name__)
     def addShortcutItem(self, origin, rcmenu, filePath):
-        #   Adds Right Click Item
-        shortcutAct = QAction("Save Shortcut to Resolve Project", rcmenu)
-        shortcutAct.triggered.connect(lambda: self.saveShortcut(origin))
-        rcmenu.addAction(shortcutAct)
+        
+        if self.shortcutsEnabled:
+            #   Adds Right Click Item
+            shortcutAct = QAction("Save Shortcut to Resolve Project", rcmenu)
+            shortcutAct.triggered.connect(lambda: self.saveShortcut(origin))
+            rcmenu.addAction(shortcutAct)
 
 
     @err_catcher(name=__name__)
@@ -481,7 +524,5 @@ class Prism_ResolveShortcuts_Functions(object):
         detailData["description"] = f'Shortcut to   "{currProjectName}"   Resolve project'
 
         origin.core.saveSceneInfo(savePath, detailData, preview=None)
-
         origin.refreshScenefiles()
-
         self.core.popup(result)

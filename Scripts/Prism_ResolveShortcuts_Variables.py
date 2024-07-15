@@ -34,12 +34,15 @@
 ####################################################
 ####################################################
 #
-#        SCENE PRESETS MENU PLUGIN
+#         RESOLVE SHORTCUTS PLUGIN
 #           by Joshua Breckeen
 #                Alta Arts
 #
-#   This PlugIn adds an additional tab to the Prism Settings menu to 
-#   allow a user to choose a directory that contains scene presets.
+#   A PlugIn that adds the ability to save a shortcut to a project that
+#   is located in the Resolve database.  This will create a .vbs file that contains
+#   the project path, and simple code to start Resolve and navigate to the project.
+#   Prism's ProjectBrowser launched from Resolve will contain a right-click menu
+#   item to save the shortcut.
 #
 ####################################################
 
@@ -49,8 +52,15 @@ import os
 
 class Prism_ResolveShortcuts_Variables(object):
     def __init__(self, core, plugin):
-        self.version = "v2.0.8-0.2"
+        self.version = "v2.0.8-0.3"
         self.pluginName = "Resolve Shortcuts"
         self.pluginType = "Custom"
+        self.sceneFormats = [".vbs"]
+        self.pluginDirectory = os.path.abspath(
+            os.path.dirname(os.path.dirname(__file__))
+            )
+        self.appIcon = os.path.join(
+            self.pluginDirectory, "UserInterfaces", "ResolveShortcuts.ico"
+            )
         self.platforms = ["Windows", "Linux", "Darwin"]
         self.pluginDirectory = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
