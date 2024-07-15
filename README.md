@@ -1,4 +1,4 @@
 # ResolveShortcuts--Prism-Plugin
 
 
-Yeah, is is a ToDo . . . .
+Yeah, it is a ToDo . . . .
