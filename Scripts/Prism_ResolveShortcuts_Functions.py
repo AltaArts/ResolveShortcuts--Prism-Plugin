@@ -57,7 +57,7 @@ from qtpy.QtWidgets import *
 
 from PrismUtils.Decorators import err_catcher_plugin as err_catcher
 
-logger = logging.getLogger(__name__)                #   TODO  add logging
+logger = logging.getLogger(__name__)
 
 
 
@@ -67,8 +67,6 @@ class Prism_ResolveShortcuts_Functions(object):
         self.plugin = plugin
         self.shortcutsEnabled = False
         self.useIcon = False
-
-        # self.resolvePlugin = self.core.getPlugin("Resolve")                     #   TODO    NEEDED???
 
         #   Settings File
         self.pluginLocation = os.path.dirname(os.path.dirname(__file__))
@@ -92,12 +90,19 @@ class Prism_ResolveShortcuts_Functions(object):
         return True
 
 
+    #   Will use the custom icon for .vbs files if enabled
     @err_catcher(name=__name__)
     def setIcon(self, extension):
         if self.shortcutsEnabled and self.useIcon:
-            if extension == ".vbs":
-                icon = os.path.join(self.pluginLocation, "UserInterfaces", "ResolveShortcuts.ico")
-                return icon
+            try:
+                if extension == ".vbs":
+                    icon = os.path.join(self.pluginLocation, "UserInterfaces", "ResolveShortcuts.ico")
+                    logger.debug("Loaded ResolveShortcut Icon")
+                    return icon
+            except FileNotFoundError:
+                logger.warning("ResolveShortcut Icon missing")
+            except Exception as e:
+                logger.warning(f"ERROR: {e}")
 
         return None
 
@@ -105,31 +110,115 @@ class Prism_ResolveShortcuts_Functions(object):
     #   Load settings from plain text file due to using .vbs for the shortcut file.
     @err_catcher(name=__name__)
     def loadSettings(self):
-
-                                                            #   TODO  IF FILE CORRUPT OR DOES NOT EXIST
-
+        #   Parses plain text into dict
         if os.path.isfile(self.settingsFile):
-            self.configData = {}
-            with open(self.settingsFile, 'r') as file:
-                for line in file:
-                    line = line.strip()
-                    if '=' in line:
-                        key, value = line.split('=', 1)
-                        self.configData[key.strip()] = value.strip()
-
-            if "shortcuts_enabled" in self.configData:
-                if self.configData["shortcuts_enabled"] == "True":
-                    self.shortcutsEnabled = True
-                else:
-                    self.shortcutsEnabled = False
-
-            if "use_icon" in self.configData:
-                if self.configData["use_icon"] == "True":
-                    self.useIcon = True
-                else:
-                    self.useIcon = False
+            try:
+                self.configData = {}
+                with open(self.settingsFile, 'r') as file:
+                    for line in file:
+                        line = line.strip()
+                        if '=' in line:
+                            key, value = line.split('=', 1)
+                            self.configData[key.strip()] = value.strip()
+                logger.debug("Config loaded")
+            except:
+                logger.warning("Setting file is corrupt")
+                self.makeSettings()
         else:
             logger.warning(f"Settings file {self.settingsFile} not found.")
+            self.makeSettings()
+
+        #   Sets enabled variable
+        self.shortcutsEnabled = False
+        if "shortcuts_enabled" in self.configData:
+            if self.configData["shortcuts_enabled"] == "True":
+                self.shortcutsEnabled = True
+                logger.debug("ResolveShortcuts is ENABLED")
+        else:
+            logger.debug("ResolveShortcuts is DISABLED")
+
+
+        #   Set icon variable
+        if "use_icon" in self.configData:
+            if self.configData["use_icon"] == "True":
+                self.useIcon = True
+            else:
+                self.useIcon = False
+
+
+    #   Makes the config file using default/auto values
+    @err_catcher(name=__name__)
+    def makeSettings(self):
+        logger.warning("Creating settings file.")
+        self.configData = {
+                        "python_exe_path": self.getPrismPython(),
+                        "plugin_path": self.pluginLocation,
+                        "dvr_script_path": self.getResolveAPILoc(),
+                        "resolve_exe": self.getResolveLoc(),
+                        "shortcuts_enabled": "False",
+                        "use_icon": "True"
+                        }
+        try:
+            with open(self.settingsFile, 'w') as file:
+                for key, value in self.configData.items():
+                    value = value.replace("\\", "/")
+                    file.write(f"{key}={value}\n")
+            logger.info(f"Settings saved to {self.settingsFile}")
+
+        except Exception as e:
+            logger.error(f"Failed to save settings to {self.settingsFile}: {e}")
+
+
+    #   Finds the path to Python included with Prism
+    @err_catcher(name=__name__)
+    def getPrismPython(self):
+        prismRoot = self.core.prismRoot
+        #   For different version of Prism which may use different Pythons
+        pythonPaths = ["Python311", "Python39"]
+
+        for path in pythonPaths:
+            prismPythonPath = os.path.join(prismRoot, path, "python.exe")
+            prismPythonPath = os.path.normpath(prismPythonPath)
+
+            if os.path.exists(prismPythonPath):
+                return prismPythonPath
+
+        return None
+
+
+    #   Since Resolve.exe does not seem to be found in winreg, this uses common install locations
+    #   Not perfect, but the user can specify the loc in Prims Settings
+    @err_catcher(name=__name__)
+    def getResolveLoc(self):
+        commonPaths = [os.path.join("C:\\", "Program Files", "Blackmagic Design", "DaVinci Resolve", "Resolve.exe"),
+                       os.path.join("C:\\", "Program Files (x86)", "Blackmagic Design", "DaVinci Resolve", "Resolve.exe"),
+                       os.path.join("C:\\", "Program Files", "DaVinci Resolve", "Resolve.exe"),
+                       os.path.join("C:\\", "Program Files (x86)", "DaVinci Resolve", "Resolve.exe"),
+                       os.path.join("D:\\", "Program Files", "Blackmagic Design", "DaVinci Resolve", "Resolve.exe"),
+                       os.path.join("D:\\", "Program Files (x86)", "Blackmagic Design", "DaVinci Resolve", "Resolve.exe"),
+                       os.path.join("D:\\", "Program Files", "DaVinci Resolve", "Resolve.exe"),
+                       os.path.join("E:\\", "Program Files (x86)", "DaVinci Resolve", "Resolve.exe")]
+        
+        for path in commonPaths:
+            if os.path.isfile(path):
+                return path
+            else:
+                return os.path.join("C:\\", "Program Files", "Blackmagic Design", "DaVinci Resolve", "Resolve.exe")
+            
+
+    #   Uses the default Davinci install location
+    @err_catcher(name=__name__)
+    def getResolveAPILoc(self):
+        
+        resolveAPIpath = os.path.join(os.environ["PROGRAMDATA"],
+                                      "Blackmagic Design",
+                                      "DaVinci Resolve",
+                                      "Support",
+                                      "Developer",
+                                      "Scripting",
+                                      "Modules"
+                                      )
+        return resolveAPIpath
 
 
     #   Save settings to plain text file due to using .vbs for the shortcut file.
@@ -147,6 +236,7 @@ class Prism_ResolveShortcuts_Functions(object):
         try:
             with open(self.settingsFile, 'w') as file:
                 for key, value in pData.items():
+                    value = value.replace("\\", "/")
                     file.write(f"{key}={value}\n")
             logger.info(f"Settings saved to {self.settingsFile}")
 
@@ -211,7 +301,10 @@ class Prism_ResolveShortcuts_Functions(object):
         lo_resolveEXE.addWidget(self.e_resolveEXE)
 
         but_browseResolveEXE = QPushButton("Browse")
-        but_browseResolveEXE.clicked.connect(lambda: self.browseFiles(target=self.e_resolveEXE, type="file", title="Select the Resolve Executable"))
+        but_browseResolveEXE.clicked.connect(lambda: self.browseFiles(target=self.e_resolveEXE,
+                                                                      type="file",
+                                                                      title="Select the Resolve Executable"
+                                                                      ))
         lo_resolveEXE.addWidget(but_browseResolveEXE)
         lo_resolveConfig.addLayout(lo_resolveEXE)
 
@@ -231,7 +324,10 @@ class Prism_ResolveShortcuts_Functions(object):
         lo_resolveApiScript.addWidget(self.e_resolveApiScript)
 
         but_browseResolveApiScript = QPushButton("Browse")
-        but_browseResolveApiScript.clicked.connect(lambda: self.browseFiles(target=self.e_resolveApiScript, type="folder", title="Select the API Directory"))
+        but_browseResolveApiScript.clicked.connect(lambda: self.browseFiles(target=self.e_resolveApiScript,
+                                                                            type="folder",
+                                                                            title="Select the API Directory"
+                                                                            ))
         lo_resolveApiScript.addWidget(but_browseResolveApiScript)
         lo_resolveConfig.addLayout(lo_resolveApiScript)
 
@@ -251,7 +347,10 @@ class Prism_ResolveShortcuts_Functions(object):
         lo_prismPython.addWidget(self.e_prismPython)
 
         but_browsePrismPython = QPushButton("Browse")
-        but_browsePrismPython.clicked.connect(lambda: self.browseFiles(target=self.e_prismPython, type="file", title="Select Prism's Python.exe"))
+        but_browsePrismPython.clicked.connect(lambda: self.browseFiles(target=self.e_prismPython,
+                                                                       type="file",
+                                                                       title="Select Prism's Python.exe"
+                                                                       ))
         lo_prismPython.addWidget(but_browsePrismPython)
         lo_resolveConfig.addLayout(lo_prismPython)
 
@@ -367,6 +466,7 @@ class Prism_ResolveShortcuts_Functions(object):
         origin.addTab(origin.w_resolveShortcuts, "Resolve Shortcuts")
 
 
+    #   Loads config values into Settings UI
     @err_catcher(name=__name__)
     def loadValues(self):
 
@@ -392,17 +492,20 @@ class Prism_ResolveShortcuts_Functions(object):
         options = QFileDialog.Options()
         options |= QFileDialog.ReadOnly
 
+        #   Get current prh in box to use for default loc
+        currentPath = target.text()
+
         if type == 'file':
             filePath, _ = QFileDialog.getOpenFileName(None,
                                                       title,
-                                                      "",
+                                                      currentPath,
                                                       "All Files (*);;Python Files (*.py)",
                                                       options=options
                                                       )
         elif type == 'folder':
             filePath = QFileDialog.getExistingDirectory(None,
                                                         title,
-                                                        "",
+                                                        currentPath,
                                                         options=options
                                                         )
         else:
@@ -411,8 +514,23 @@ class Prism_ResolveShortcuts_Functions(object):
 
         if filePath:
             target.setText(filePath)
+            
+
+    @err_catcher(name=__name__)
+    def resetPaths(self):
+        text = ("Do you want to reset all Resolve Shortcut settings to\n"
+                "their default values?")
+        title = "Reset Settings"
+        result = self.core.popupQuestion(text=text, title=title)
+
+        if result == "Yes":
+            logger.debug("Resetting ResolveShortcuts settings to default values.")
+
+            self.makeSettings()
+            self.loadValues()
 
 
+    #   Configures Settings UI elements
     @err_catcher(name=__name__)
     def refreshUI(self, *args):
         set = self.checkEnviroVar()
@@ -432,13 +550,15 @@ class Prism_ResolveShortcuts_Functions(object):
             self.gb_resolveConfig.setEnabled(True)
         else:
             self.gb_resolveConfig.setEnabled(False)
-        
 
+        
+    #   Checks if required enviro variable exists
     @err_catcher(name=__name__)
     def checkEnviroVar(self):
         return 'DVR_shortcuts_path' in os.environ
 
 
+    #   Set required enviro var and exits Prism
     @err_catcher(name=__name__)
     def setEnviroVar(self):
         try:
@@ -451,13 +571,16 @@ class Prism_ResolveShortcuts_Functions(object):
             result = self.core.popupQuestion(text=text, title=title)
 
             if result == "Yes":
+                logger.debug("Setting 'DVR_shortcuts_path' environment variable")
+                logger.debug("Prism will exit")
                 subprocess.run(['setx', 'DVR_shortcuts_path', self.pluginLocation], check=True)
                 self.core.PrismTray.exitTray()
 
         except Exception as e:
             self.core.popup("Failed")
-        
 
+        
+    #   Removes enviro var
     @err_catcher(name=__name__)
     def removeEnviroVar(self):
         try:
@@ -470,6 +593,8 @@ class Prism_ResolveShortcuts_Functions(object):
             result = self.core.popupQuestion(text=text, title=title)
 
             if result == "Yes":
+                logger.debug("Removing 'DVR_shortcuts_path' environment variable")
+                logger.debug("Prism will exit")
                 subprocess.run(['setx', 'DVR_shortcuts_path', ""], check=True)
                 self.core.PrismTray.exitTray()
 
@@ -477,31 +602,28 @@ class Prism_ResolveShortcuts_Functions(object):
             self.core.popup("Failed")
 
 
-    @err_catcher(name=__name__)
-    def resetPaths(self):
-
-        #   TODO
-
-        pass
- 
-
+    #   Adds right-click menu item
     @err_catcher(name=__name__)
     def addShortcutItem(self, origin, rcmenu, filePath):
-        
         if self.shortcutsEnabled:
-            #   Adds Right Click Item
             shortcutAct = QAction("Save Shortcut to Resolve Project", rcmenu)
             shortcutAct.triggered.connect(lambda: self.saveShortcut(origin))
             rcmenu.addAction(shortcutAct)
 
 
+    #   Builds and saves shortcut (.vbs file)
     @err_catcher(name=__name__)
     def saveShortcut(self, origin):
+        #   Imports bridge script with the Resolve API
         try:
             from DvResolve_Project_Shortcuts import ResolveProjectShortcuts
+            logger.debug("Imported Resolve API")
+
         except Exception as e:
-            self.core.popup("Failed")
+            logger.warning("Failed to import Resolove API module")
+            self.core.popup("Failed to import Resolve API module")
         
+        #   Get details and save path data
         entity = origin.getCurrentEntity()
         curDep = origin.getCurrentDepartment()
         curTask = origin.getCurrentTask()
@@ -513,16 +635,23 @@ class Prism_ResolveShortcuts_Functions(object):
                                                  # location=location
                                                  )
 
-
         #   TODO Thumbnail
 
 
+        #   Instantiates and calls the save from the bridge script
         shortcuts = ResolveProjectShortcuts()
-        currProjectName, result = shortcuts.saveProjectShortcut(savePath)
+        try:
+            currProjectName, result = shortcuts.saveProjectShortcut(savePath)
+            logger.debug(result)
+        except Exception as e:
+            logger.warning(f"ERROR:  unable to save Resolve shortcut:")
+            logger.warning(e)
 
+        #   Adds custom description item
         detailData = {}
         detailData["description"] = f'Shortcut to   "{currProjectName}"   Resolve project'
 
+        #   Saves the details to the versioninfo.json
         origin.core.saveSceneInfo(savePath, detailData, preview=None)
         origin.refreshScenefiles()
         self.core.popup(result)

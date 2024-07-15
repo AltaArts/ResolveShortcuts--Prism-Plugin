@@ -55,7 +55,6 @@ import argparse
 
 class ResolveProjectShortcuts(object):
     def __init__(self):
-
         self.pluginPath = os.path.dirname(os.path.dirname(__file__))
         self.settingsFile = os.path.join(self.pluginPath, "ResolveShortcuts_Config.txt")
         self.resolve = None
@@ -99,6 +98,7 @@ class ResolveProjectShortcuts(object):
             print("ERROR: Config file formatting error.")
 
 
+    # Continuously attempt to get the Resolve instance
     def startResolve(self, timeout=30):
         startTime = time.time()
 
@@ -106,13 +106,15 @@ class ResolveProjectShortcuts(object):
         subprocess.Popen(self.resolveExe)
 
         try:
-            # Attempt to get the Resolve instance
+            #   Starts loop
             while self.resolve is None:
                 try:
                     self.getResolve()
                     if self.resolve is not None:
                         print("Resolve is running.")
+                        #   Breakout once it is loaded
                         break
+
                 except Exception as e:
                     # Check if timeout exceeded
                     if time.time() - startTime > timeout:
@@ -130,23 +132,26 @@ class ResolveProjectShortcuts(object):
             print("Error:", e)
 
 
+    #   Imports DVR API Script
     def getResolve(self):
         try:
             import DaVinciResolveScript as dvr
+
         except ImportError:
             print("Failed to import DaVinciResolveScript")
             sys.exit(1)
 
+        #   Instantiate the API
         self.resolve = dvr.scriptapp("Resolve")
 
 
     def openResolveProject(self, projectLoadPath, timeout):
-            
+        #   Starts Resolve and imports the API    
         self.startResolve(timeout)
 
         if not self.resolve:
             return
-
+        #   Checks if arg path is misformatted
         if len(projectLoadPath) < 2:
             print("Invalid project path format.")
             return
@@ -155,6 +160,7 @@ class ResolveProjectShortcuts(object):
         self.pm = self.resolve.GetProjectManager()
         currDbName = self.pm.GetCurrentDatabase()["DbName"]
 
+        #   Splits arg path into dirs and Project name
         path_components = projectLoadPath.split("\\")
 
         if len(path_components) < 2:
@@ -164,10 +170,14 @@ class ResolveProjectShortcuts(object):
         projectDB = path_components[0]
         projectPath = "\\".join(path_components[1:])
 
+        #   Since the API call to change DB's does not seem to work,
+        #   can only check if the database match
         if currDbName != projectDB:
             print("Incorrect Resolve Database selected")
             return
 
+        #   Saves the currently open project if it is not the
+        #   default name.  Is useful if there is a project already open.
         try: 
             currProjectName = self.pm.GetCurrentProject().GetName()
             if currProjectName != "Untitled Project":
@@ -175,7 +185,8 @@ class ResolveProjectShortcuts(object):
         except AttributeError:
             pass
         
-        
+        #   Navigates to the root folder to start since there is no way
+        #   to go directly to a dir path
         self.pm.GotoRootFolder()
         
         folders = projectPath.split("\\")
@@ -200,9 +211,11 @@ class ResolveProjectShortcuts(object):
 
     def getProjectPath(self):
         try:
+            #   Get the API
             self.getResolve()
-            self.pm = self.resolve.GetProjectManager()
 
+            #   Gets the various names
+            self.pm = self.resolve.GetProjectManager()
             db = self.pm.GetCurrentDatabase()
             dbName = db["DbName"]
 
@@ -219,11 +232,13 @@ class ResolveProjectShortcuts(object):
                 if currentFolder == previousFolder:
                     break  # Reached the root folder
 
-            parentFolders.reverse()  # Reverse the list to have the hierarchy from top to bottom
+            # Reverse the list of sub dirs
+            parentFolders.reverse()
 
             # Construct the project path string
             projectPath = "\\".join(parentFolders) + "\\" + currProjectName
 
+            #   Add DB name to path
             projectPath = dbName + "\\" + projectPath
             projectPath = projectPath.replace("\\\\", "\\")
 
@@ -237,6 +252,7 @@ class ResolveProjectShortcuts(object):
     def saveProjectShortcut(self, savePath):
         currProjectName, projectPath = self.getProjectPath()
 
+        #   Gets the template .vbs from plugin folder
         templateFile = os.path.join(self.pluginPath,
                                     "Scripts",
                                     "Template",
@@ -247,7 +263,7 @@ class ResolveProjectShortcuts(object):
             with open(templateFile, 'r') as file:
                 content = file.read()
 
-            # Replace the placeholder with the actual project path
+            # Replace the placeholder with the project path
             modifiedContent = content.replace("PROJECT_PATH_REPLACE", projectPath)
 
             # Save the modified content to the new file
@@ -286,10 +302,3 @@ if __name__ == "__main__":
         savePath = args.path
 
         resolveShortcuts.saveProjectShortcut(savePath)
-
-
-    # projectPath = "db_c0a5659ba25442149ff8b6775a4be99f\Random Practice\Tears of Steal_v002"
-
-    # resolveShortcuts = ResolveProjectShortcuts()
-
-    # resolveShortcuts.openResolveProject(projectPath, timeout=30)
