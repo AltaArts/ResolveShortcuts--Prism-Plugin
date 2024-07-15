@@ -76,7 +76,7 @@ class Prism_ResolveShortcuts_Functions(object):
 
         #   Callbacks
         logger.debug("Loading callbacks")
-        self.core.registerCallback("userSettings_loadUI", self.userSettings_loadUI, plugin=self, priority=40)
+        self.core.registerCallback("userSettings_loadUI", self.userSettings_loadUI, plugin=self)
         self.core.registerCallback("onUserSettingsSave", self.saveSettings, plugin=self)
         self.core.registerCallback("getIconPathForFileType", self.setIcon, plugin=self)
         #   Add RCL menu item only in Resolve
@@ -254,13 +254,7 @@ class Prism_ResolveShortcuts_Functions(object):
 
         origin.w_resolveShortcuts.setLayout(lo_resolveShortcuts)
 
-        # Make Spacers
-        fixed_20_Vspacer = QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed)
-        expanding_Vspacer = QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        fixed_60_Hspacer = QSpacerItem(60, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-        expanding_Hspacer = QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-
-        lo_resolveShortcuts.addItem(fixed_20_Vspacer)
+        lo_resolveShortcuts.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
 
         # ENABLE SHORTCUT FUNCTIONS CHECKBOX
         lo_topBar = QHBoxLayout()
@@ -268,15 +262,15 @@ class Prism_ResolveShortcuts_Functions(object):
         self.chb_enableShortcutFunctions = QCheckBox("Enable Resolve Shortcut Functions")
         lo_topBar.addWidget(self.chb_enableShortcutFunctions)
 
-        lo_topBar.addItem(expanding_Hspacer)
+        lo_topBar.addItem(QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
-        l_enviroVarSet = QLabel("Enviro Variable:  ")
+        l_enviroVarSet = QLabel("Enviro Variable is:")
         lo_topBar.addWidget(l_enviroVarSet)
 
-        self.l_enviroStatus = QLabel("NOT SET")
+        self.l_enviroStatus = QLabel("NOT SET    ")
         lo_topBar.addWidget(self.l_enviroStatus)
 
-        self.but_setEnviroVar = QPushButton("Set")
+        self.but_setEnviroVar = QPushButton("Set    ")
         self.but_setEnviroVar.clicked.connect(self.setEnviroVar)
         lo_topBar.addWidget(self.but_setEnviroVar)
 
@@ -284,7 +278,7 @@ class Prism_ResolveShortcuts_Functions(object):
         self.but_removeEnviroVar.clicked.connect(self.removeEnviroVar)
         lo_topBar.addWidget(self.but_removeEnviroVar)
 
-        lo_topBar.addItem(fixed_60_Hspacer)
+        lo_topBar.addItem(QSpacerItem(60, 20, QSizePolicy.Fixed, QSizePolicy.Minimum))
 
         lo_resolveShortcuts.addLayout(lo_topBar)
 
@@ -312,7 +306,7 @@ class Prism_ResolveShortcuts_Functions(object):
         lo_resolveConfig.addWidget(l_resolveExample)
 
 
-        lo_resolveConfig.addItem(fixed_20_Vspacer)
+        lo_resolveConfig.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
 
 
         # RESOLVE API SECTION
@@ -335,7 +329,7 @@ class Prism_ResolveShortcuts_Functions(object):
         lo_resolveConfig.addWidget(l_apiScriptExample)
 
 
-        lo_resolveConfig.addItem(fixed_20_Vspacer)
+        lo_resolveConfig.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
 
 
         # PRISM PYTHON SECTION
@@ -358,7 +352,7 @@ class Prism_ResolveShortcuts_Functions(object):
         lo_resolveConfig.addWidget(l_prismPythonExample)
 
 
-        lo_resolveConfig.addItem(fixed_20_Vspacer)
+        lo_resolveConfig.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
 
 
         # PLUGIN LOCATION SECTION
@@ -381,7 +375,7 @@ class Prism_ResolveShortcuts_Functions(object):
         lo_resolveConfig.addWidget(l_pluginLocExample)
 
 
-        lo_resolveConfig.addItem(fixed_20_Vspacer)
+        lo_resolveConfig.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
 
 
         # BOTTOM BAR
@@ -390,7 +384,7 @@ class Prism_ResolveShortcuts_Functions(object):
         self.chb_useIcon = QCheckBox("Associate Icon with shortcut filetype")
         lo_btmBar.addWidget(self.chb_useIcon)
 
-        lo_btmBar.addItem(expanding_Hspacer)
+        lo_btmBar.addItem(QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
         l_reset = QLabel("Reset Locations to default:  ")
         lo_btmBar.addWidget(l_reset)
@@ -398,13 +392,13 @@ class Prism_ResolveShortcuts_Functions(object):
         but_reset = QPushButton("Reset")
         but_reset.clicked.connect(self.resetPaths)
         lo_btmBar.addWidget(but_reset)
-        lo_btmBar.addItem(fixed_60_Hspacer)
+        lo_btmBar.addItem(QSpacerItem(60, 20, QSizePolicy.Fixed, QSizePolicy.Minimum))
         lo_resolveConfig.addLayout(lo_btmBar)
 
         lo_resolveShortcuts.addWidget(self.gb_resolveConfig)
 
         # Add an expanding spacer at the bottom
-        lo_resolveShortcuts.addItem(expanding_Vspacer)
+        lo_resolveShortcuts.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
         #   Tooltips
         tip = "Globally enable the Resolve Shortcuts functionality."
@@ -449,7 +443,8 @@ class Prism_ResolveShortcuts_Functions(object):
         l_pluginLoc.setToolTip(tip)
         self.e_pluginLoc.setToolTip(tip)
 
-        tip = "Associate custom icon to shortcut scenefiles (.vbs)"
+        tip = ("Associate custom icon to shortcut scenefiles (.vbs)\n"
+               "Prism must be restarted for change to be visible.")
         self.chb_useIcon.setToolTip(tip)
 
         tip = "Force regeneration of the default paths."
