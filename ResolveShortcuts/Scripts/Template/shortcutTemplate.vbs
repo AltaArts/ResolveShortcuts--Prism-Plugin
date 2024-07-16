@@ -15,12 +15,18 @@ Set fso = CreateObject("Scripting.FileSystemObject")
 ' Get the DVR_shortcuts_path environment variable
 dvrShortcutsPath = GetEnv("DVR_shortcuts_path")
 If dvrShortcutsPath = "" Then
-    WScript.Echo "Error: DVR_shortcuts_path environment variable is not set."
+    WScript.Echo "ERROR: DVR_shortcuts_path environment variable is not set."
     WScript.Quit
 End If
 
 ' Build the path to the configuration file
 configFilePath = dvrShortcutsPath & "\ResolveShortcuts_Config.txt"
+
+' Check if the config file exists
+If Not fso.FileExists(configFilePath) Then
+    WScript.Echo "ERROR: Configuration file not found at " & configFilePath
+    WScript.Quit
+End If
 
 ' Open the configuration file
 Set file = fso.OpenTextFile(configFilePath, 1)
