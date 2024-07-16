@@ -223,7 +223,7 @@ class Prism_ResolveShortcuts_Functions(object):
 
     #   Save settings to plain text file due to using .vbs for the shortcut file.
     @err_catcher(name=__name__)
-    def saveSettings(self, origin):
+    def saveSettings(self, origin=None):
         pData = {
             "python_exe_path": self.e_prismPython.text(),
             "plugin_path": self.e_pluginLoc.text(),
@@ -405,7 +405,10 @@ class Prism_ResolveShortcuts_Functions(object):
         self.chb_enableShortcutFunctions.setToolTip(tip)
 
         tip = ("Status of the system environment variable (DVR_shortcuts_path).\n"
-               "The enviro variable must be set to use the shortcut functions." )
+               "The enviro variable must be set to use the shortcut functions.\n\n"
+               "To manually set via Prism enviroment or system:\n\n"
+               "KEY:        'DVR_shortcuts_path'\n"
+               "VALUE:    '[path/to/ResolveShortcuts] plugin dir'")
         l_enviroVarSet.setToolTip(tip)
         self.l_enviroStatus.setToolTip(tip)
 
@@ -566,6 +569,7 @@ class Prism_ResolveShortcuts_Functions(object):
             result = self.core.popupQuestion(text=text, title=title)
 
             if result == "Yes":
+                self.saveSettings()
                 logger.debug("Setting 'DVR_shortcuts_path' environment variable")
                 logger.debug("Prism will exit")
                 subprocess.run(['setx', 'DVR_shortcuts_path', self.pluginLocation], check=True)
@@ -588,6 +592,7 @@ class Prism_ResolveShortcuts_Functions(object):
             result = self.core.popupQuestion(text=text, title=title)
 
             if result == "Yes":
+                self.saveSettings()
                 logger.debug("Removing 'DVR_shortcuts_path' environment variable")
                 logger.debug("Prism will exit")
                 subprocess.run(['setx', 'DVR_shortcuts_path', ""], check=True)
