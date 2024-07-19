@@ -48,8 +48,10 @@
 
 
 import os
+import glob
 import logging
 import subprocess
+import tempfile
 
 from qtpy.QtCore import *
 from qtpy.QtGui import *
@@ -137,7 +139,6 @@ class Prism_ResolveShortcuts_Functions(object):
         else:
             logger.debug("ResolveShortcuts is DISABLED")
 
-
         #   Set icon variable
         if "use_icon" in self.configData:
             if self.configData["use_icon"] == "True":
@@ -151,6 +152,7 @@ class Prism_ResolveShortcuts_Functions(object):
     def makeSettings(self):
         logger.warning("Creating settings file.")
         self.configData = {
+                        "current_plugin_version": self.version,
                         "python_exe_path": self.getPrismPython(),
                         "plugin_path": self.pluginLocation,
                         "dvr_script_path": self.getResolveAPILoc(),
@@ -197,7 +199,7 @@ class Prism_ResolveShortcuts_Functions(object):
                        os.path.join("D:\\", "Program Files", "Blackmagic Design", "DaVinci Resolve", "Resolve.exe"),
                        os.path.join("D:\\", "Program Files (x86)", "Blackmagic Design", "DaVinci Resolve", "Resolve.exe"),
                        os.path.join("D:\\", "Program Files", "DaVinci Resolve", "Resolve.exe"),
-                       os.path.join("E:\\", "Program Files (x86)", "DaVinci Resolve", "Resolve.exe")]
+                       os.path.join("E:\\", "Program Files", "DaVinci Resolve", "Resolve.exe")]
         
         for path in commonPaths:
             if os.path.isfile(path):
@@ -209,7 +211,6 @@ class Prism_ResolveShortcuts_Functions(object):
     #   Uses the default Davinci install location
     @err_catcher(name=__name__)
     def getResolveAPILoc(self):
-        
         resolveAPIpath = os.path.join(os.environ["PROGRAMDATA"],
                                       "Blackmagic Design",
                                       "DaVinci Resolve",
@@ -224,14 +225,14 @@ class Prism_ResolveShortcuts_Functions(object):
     #   Save settings to plain text file due to using .vbs for the shortcut file.
     @err_catcher(name=__name__)
     def saveSettings(self, origin=None):
-        pData = {
-            "python_exe_path": self.e_prismPython.text(),
-            "plugin_path": self.e_pluginLoc.text(),
-            "dvr_script_path": self.e_resolveApiScript.text(),
-            "resolve_exe": self.e_resolveEXE.text(),
-            "shortcuts_enabled": str(self.chb_enableShortcutFunctions.isChecked()),
-            "use_icon": str(self.chb_useIcon.isChecked())
-            }
+        pData = {"current_plugin_version": self.version,
+                 "python_exe_path": self.e_prismPython.text(),
+                 "plugin_path": self.e_pluginLoc.text(),
+                 "dvr_script_path": self.e_resolveApiScript.text(),
+                 "resolve_exe": self.e_resolveEXE.text(),
+                 "shortcuts_enabled": str(self.chb_enableShortcutFunctions.isChecked()),
+                 "use_icon": str(self.chb_useIcon.isChecked())
+                 }
 
         try:
             with open(self.settingsFile, 'w') as file:
@@ -247,7 +248,6 @@ class Prism_ResolveShortcuts_Functions(object):
     # #   Called with Callback
     @err_catcher(name=__name__)
     def userSettings_loadUI(self, origin):      #   ADDING "ResolveShortcuts" TO SETTINGS
-
         # Create a Widget
         origin.w_resolveShortcuts = QWidget()
         lo_resolveShortcuts = QVBoxLayout(origin.w_resolveShortcuts)
@@ -467,7 +467,6 @@ class Prism_ResolveShortcuts_Functions(object):
     #   Loads config values into Settings UI
     @err_catcher(name=__name__)
     def loadValues(self):
-
         if "resolve_exe" in self.configData:
             self.e_resolveEXE.setText(self.configData["resolve_exe"])
 
@@ -559,7 +558,6 @@ class Prism_ResolveShortcuts_Functions(object):
     #   Set required enviro var and exits Prism
     @err_catcher(name=__name__)
     def setEnviroVar(self):
-        try:
             text = ("Prism will need to shutdown for the environment\n"
                     "variable to be set.  Afterwards you will need to\n"
                      "manually restart Prism.\n\n"
@@ -569,20 +567,22 @@ class Prism_ResolveShortcuts_Functions(object):
             result = self.core.popupQuestion(text=text, title=title)
 
             if result == "Yes":
-                self.saveSettings()
-                logger.debug("Setting 'DVR_shortcuts_path' environment variable")
-                logger.debug("Prism will exit")
-                subprocess.run(['setx', 'DVR_shortcuts_path', self.pluginLocation], check=True)
-                self.core.PrismTray.exitTray()
+                try:
+                    self.saveSettings()
+                    logger.debug("Setting 'DVR_shortcuts_path' environment variable")
+                    logger.debug("Prism will exit")
+                    subprocess.run(['setx', 'DVR_shortcuts_path', self.pluginLocation], check=True)
+                    self.core.PrismTray.exitTray()
 
-        except Exception as e:
-            self.core.popup("Failed")
+                except Exception as e:
+                    self.core.popup("Failed to set environment variable.")
+                    logger.error("Failed to set environment variable.")
+                    logger.error(e)
 
         
     #   Removes enviro var
     @err_catcher(name=__name__)
     def removeEnviroVar(self):
-        try:
             text = ("Prism will need to shutdown for the environment\n"
                     "variable to be set.  Afterwards you will need to\n"
                      "manually restart Prism.\n\n"
@@ -592,14 +592,17 @@ class Prism_ResolveShortcuts_Functions(object):
             result = self.core.popupQuestion(text=text, title=title)
 
             if result == "Yes":
-                self.saveSettings()
-                logger.debug("Removing 'DVR_shortcuts_path' environment variable")
-                logger.debug("Prism will exit")
-                subprocess.run(['setx', 'DVR_shortcuts_path', ""], check=True)
-                self.core.PrismTray.exitTray()
+                try:
+                    self.saveSettings()
+                    logger.debug("Removing 'DVR_shortcuts_path' environment variable")
+                    logger.debug("Prism will exit")
+                    subprocess.run(['setx', 'DVR_shortcuts_path', ""], check=True)
+                    self.core.PrismTray.exitTray()
 
-        except Exception as e:
-            self.core.popup("Failed")
+                except Exception as e:
+                    self.core.popup("Failed to remove environment variable.")
+                    logger.error("Failed to remove environment variable.")
+                    logger.error(e)
 
 
     #   Adds right-click menu item
@@ -617,11 +620,11 @@ class Prism_ResolveShortcuts_Functions(object):
         #   Imports bridge script with the Resolve API
         try:
             from DvResolve_Project_Shortcuts import ResolveProjectShortcuts
-            logger.debug("Imported Resolve API")
+            logger.debug("Imported ResolveShortcuts")
 
         except Exception as e:
-            logger.warning("Failed to import Resolove API module")
-            self.core.popup("Failed to import Resolve API module")
+            logger.warning("Failed to import ResolveShortcuts module")
+            self.core.popup("Failed to import ResolveShortcuts module")
         
         #   Get details and save path data
         entity = origin.getCurrentEntity()
@@ -634,25 +637,52 @@ class Prism_ResolveShortcuts_Functions(object):
                                                  extension=".vbs",
                                                  # location=location
                                                  )
-
-        #   TODO Thumbnail
-
+        preview = None
 
         #   Instantiates and calls the save from the bridge script
         shortcuts = ResolveProjectShortcuts()
-        try:
-            currProjectName, result = shortcuts.saveProjectShortcut(savePath)
-            logger.debug(result)
-        except Exception as e:
-            logger.warning(f"ERROR:  unable to save Resolve shortcut:")
-            logger.warning(e)
+        currProjName, saveResult = shortcuts.saveProjectShortcut(savePath)
 
-        #   Adds custom description item
-        detailData = {}
-        detailData["description"] = f'Shortcut to   "{currProjectName}"   Resolve project'
+        if saveResult is True:
+            thumbDir = tempfile.TemporaryDirectory()
+            thumbName = "PrismThumbImage"
 
-        #   Saves the details to the versioninfo.json
-        origin.core.saveSceneInfo(savePath, detailData, preview=None)
-        origin.refreshScenefiles()
-        self.core.popup(result)
+            #   Adds custom description item
+            detailData = {}
+            detailData["description"] = f'Shortcut to   "{currProjName}"   Resolve project'
 
+            thumbResult = shortcuts.getThumbnail(thumbDir.name, thumbName)
+
+            if thumbResult is True:
+                try:
+                    pattern = os.path.join(thumbDir.name, thumbName + "_*.jpg")
+                    matching_files = glob.glob(pattern)
+
+                    if matching_files:
+                        thumbNail = matching_files[0]
+                        pixMap = self.core.media.getPixmapFromPath(thumbNail)
+                        preview = self.core.media.scalePixmap(pixMap,
+                                                            self.core.scenePreviewWidth,
+                                                            self.core.scenePreviewHeight,
+                                                            fitIntoBounds=False,
+                                                            crop=True
+                                                            )
+                    fullResult = (f"Saved shortcut to '{currProjName}'\n"
+                                  "with thumbnail.")
+                except:
+                    fullResult = (f"Saved shortcut to '{currProjName}'\n"
+                                  "without thumbnail.")
+            else:
+                fullResult = (f"Saved shortcut to '{currProjName}'\n"
+                              "without thumbnail.")
+
+            #   Saves the details to the versioninfo.json
+            # origin.core.saveSceneInfo(savePath, detailData, preview=None)
+            origin.core.saveSceneInfo(savePath, detailData, preview=preview)
+            origin.refreshScenefiles()
+            
+        else:
+            fullResult = f"Failed to save shortcut to {currProjName}:\n\n{saveResult}"
+
+        logger.debug(fullResult)
+        self.core.popup(fullResult)

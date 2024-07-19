@@ -58,8 +58,6 @@ class ResolveProjectShortcuts(object):
         self.pluginPath = os.path.dirname(os.path.dirname(__file__))
         self.settingsFile = os.path.join(self.pluginPath, "ResolveShortcuts_Config.txt")
         self.resolve = None
-        self.pm = None
-        self.currProject = None
 
         self.resolveExe, dvr_script_path = self.loadSettings()
 
@@ -87,6 +85,8 @@ class ResolveProjectShortcuts(object):
                         dvr_script_path = value
                     elif key == 'resolve_exe':
                         resolveEXE = value
+                    elif key == "current_plugin_version":
+                        self.pluginVersion = value
 
             return resolveEXE, dvr_script_path
 
@@ -96,10 +96,11 @@ class ResolveProjectShortcuts(object):
         
         except Exception as e:
             print("ERROR: Config file formatting error.")
+            return None
 
 
     # Continuously attempt to get the Resolve instance
-    def startResolve(self, timeout=30):
+    def startResolve(self, timeout):
         startTime = time.time()
 
         # Start Resolve
@@ -145,7 +146,7 @@ class ResolveProjectShortcuts(object):
         self.resolve = dvr.scriptapp("Resolve")
 
 
-    def openResolveProject(self, projectLoadPath, timeout):
+    def openResolveProject(self, projectLoadPath, timeout=30):
         #   Starts Resolve and imports the API    
         self.startResolve(timeout)
 
@@ -216,10 +217,11 @@ class ResolveProjectShortcuts(object):
 
             #   Gets the various names
             self.pm = self.resolve.GetProjectManager()
-            db = self.pm.GetCurrentDatabase()
-            dbName = db["DbName"]
-
-            currProjectName = self.pm.GetCurrentProject().GetName()
+            self.db = self.pm.GetCurrentDatabase()
+            dbName = self.db["DbName"]
+            self.currProject = self.pm.GetCurrentProject()
+            self.currProjectName = self.currProject.GetName()
+            self.currTimeline = self.currProject.GetCurrentTimeline()
             currentFolder = self.pm.GetCurrentFolder()
 
             # Get parent folders recursively
@@ -236,21 +238,44 @@ class ResolveProjectShortcuts(object):
             parentFolders.reverse()
 
             # Construct the project path string
-            projectPath = "\\".join(parentFolders) + "\\" + currProjectName
+            projectPath = "\\".join(parentFolders) + "\\" + self.currProjectName
 
             #   Add DB name to path
             projectPath = dbName + "\\" + projectPath
-            projectPath = projectPath.replace("\\\\", "\\")
+            self.projectPath = projectPath.replace("\\\\", "\\")
 
-            return currProjectName, projectPath
+            print(f"projectPath:  {self.projectPath}")
+
+            self.openResolveProject(self.projectPath)
 
         except Exception as e:
             print("Error:", e)
+
+
+    # def getThumbnail(self, thumbPath):
+    def getThumbnail(self, thumbDir, thumbName):
+        try:
+            currPage = self.resolve.GetCurrentPage()
+            self.resolve.OpenPage("color")
+            time.sleep(1)
+
+            gallery = self.currProject.GetGallery()
+            album = gallery.GetCurrentStillAlbum()
+
+            still = [self.currTimeline.GrabStill()]
+            album.ExportStills(still, thumbDir, thumbName, "jpg") 
+            album.DeleteStills(still)
+
+            self.resolve.OpenPage(currPage)                      
+
+            return True
+
+        except Exception as e:
             return e
 
 
     def saveProjectShortcut(self, savePath):
-        currProjectName, projectPath = self.getProjectPath()
+        self.getProjectPath()
 
         #   Gets the template .vbs from plugin folder
         templateFile = os.path.join(self.pluginPath,
@@ -263,27 +288,30 @@ class ResolveProjectShortcuts(object):
             with open(templateFile, 'r') as file:
                 content = file.read()
 
+            # Replace the placeholder with the plugin version
+            modifiedContent = content.replace("VERSION_REPLACE", self.pluginVersion)
+
             # Replace the placeholder with the project path
-            modifiedContent = content.replace("PROJECT_PATH_REPLACE", projectPath)
+            modifiedContent = modifiedContent.replace("PROJECT_PATH_REPLACE", self.projectPath)
 
             # Save the modified content to the new file
             with open(savePath, 'w') as file:
                 file.write(modifiedContent)
 
-            result = f"Saved shortcut to {currProjectName}"
+            saveResult = True
 
         except Exception as e:
-            result = f"Error while saving shortcut: {e}"
+            saveResult = e
         
-        return currProjectName, result
-
+        return self.currProjectName, saveResult
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Resolve Project Shortcuts")
 
     parser.add_argument("mode",
                         choices=["load", "save"],
-                        help="Mode: 'load' to load a project or 'save' to save a project shortcut"
+                        help="Mode: 'load' to load a Resolve project from the shortcut, or 'save' to save a shortcut to a Resolve project."
                         )
     
     parser.add_argument("path", help="Path to project or file")
