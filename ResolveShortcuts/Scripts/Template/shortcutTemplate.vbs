@@ -1,6 +1,8 @@
 ' THIS IS A SHORTCUT FILE TO A PROJECT IN DAVINCI RESOLVE
 ' IT WILL OPEN THE PROJECT AT THE BELOW PATH
 
+' Generated with version [VERSION_REPLACE] of the ResolveShortcuts Prism Plugin 
+
 ' SHORTCUT PROJECT PATH INFO
 'vvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 projectPath = "PROJECT_PATH_REPLACE"
