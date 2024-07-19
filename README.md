@@ -25,6 +25,7 @@ A shortcut can be saved into Prism by opening the Prism Project Browser from the
 - The plugin will attempt to set the required filepaths during first run of the plugin.  This assumes that Resolve is installed in the default location.  If the plugin is moved on the system or Resolve is not installed into the default location, the correct filepaths must be set in the settings.  The plugin directory must be named "ResolveShortcuts".
 - It seems that Resolve's API to change databases is not working correctly.  So if a shortcut is trying to reach a project that is on another database to what Resolve is on currently, it will not work.  The solution is to navigate Resolve to the desired database and then the shortcuts will work.
 - Shortcuts work for both local and Cloud databases.
+- During shortcut generation, a Prism thumbnail will be attempted to be saved using Resolve's stills capture functions.  It should work in most situations. 
 - To aid is use, tooltips are provided throughout.
   
 <br/>
