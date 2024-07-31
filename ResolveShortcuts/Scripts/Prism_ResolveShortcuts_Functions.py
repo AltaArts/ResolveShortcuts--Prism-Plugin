@@ -84,6 +84,7 @@ class Prism_ResolveShortcuts_Functions(object):
         #   Add RCL menu item only in Resolve
         if self.core.appPlugin.pluginName == "Resolve":
             self.core.registerCallback("openPBFileContextMenu", self.addShortcutItem, plugin=self)
+            self.core.registerCallback("mediaPlayerContextMenuRequested", self.addImportItem, plugin=self)        
 
 
     # if returns true, the plugin will be loaded by Prism
@@ -233,7 +234,6 @@ class Prism_ResolveShortcuts_Functions(object):
                  "shortcuts_enabled": str(self.chb_enableShortcutFunctions.isChecked()),
                  "use_icon": str(self.chb_useIcon.isChecked())
                  }
-
         try:
             with open(self.settingsFile, 'w') as file:
                 for key, value in pData.items():
@@ -614,6 +614,84 @@ class Prism_ResolveShortcuts_Functions(object):
             rcmenu.addAction(shortcutAct)
 
 
+    #   Adds right-click menu item                                      TODO   IN PROGRESS
+    @err_catcher(name=__name__)
+    def addImportItem(self, origin, menu):
+        if self.shortcutsEnabled:
+            #   Imports bridge script with the Resolve API
+            try:
+                from DvResolve_Project_Shortcuts import ResolveProjectShortcuts
+                logger.debug("Imported ResolveShortcuts")
+                shortcuts = ResolveProjectShortcuts()
+
+            except Exception as e:
+                logger.warning("Failed to import ResolveShortcuts module")
+                self.core.popup("Failed to import ResolveShortcuts module")
+                return
+
+            #   Checks to make sure right-click was on Media Browser
+            if not type(origin.origin).__name__ == "MediaBrowser":
+                return
+
+            version = origin.origin.getCurrentVersion()
+            if not version:
+                return 
+
+            self.menuContext = "Media Files:"
+            fileData = None
+
+            if not origin.seq:
+                return
+
+            # try:
+            #     logger.debug("Loading Media Data")
+            #     #   Retrieves some File Data
+            #     rawData = origin.getSelectedContexts()
+            #     if rawData and isinstance(rawData[0], dict):
+            #         fileData = rawData[0]
+            #     else:
+            #         fileData = {}
+
+            #     fileData["sourceDir"] = fileData["path"]
+            #     fileData["extension"] = os.path.splitext(fileData["source"])[1]
+
+            # except Exception as e:
+            #     msg = f"Error Getting File Context Info {str(e)}"
+            #     self.core.popup(msg)
+            #     logger.warning(f"ERROR: Cannot Load Media Data: {e}")
+
+            # #   If the item is a single file
+            # if len(origin.seq) < 2:
+            #     self.singleFileMode = True
+            #     fileData["sourcePath"] = origin.seq[0]
+            #     fileData["sourceFilename"] = os.path.basename(origin.seq[0])
+
+            # #   If the item is an Image Sequence
+            # elif len(origin.seq) > 1:
+            #     self.singleFileMode = False
+            #     fileData["currentFrame"] = os.path.basename(origin.seq[origin.getCurrentFrame()])
+            #     filenameNoExt = os.path.splitext(fileData["currentFrame"])[0]
+            #     fileData["frameNumber"] = os.path.splitext(filenameNoExt)[1]
+            #     fileData["sourceFilename"] = fileData["source"]
+
+            #     fileList = []
+            #     for file in origin.seq:
+            #         fileList.append(file)
+            #     fileData["sourcePath"] = fileList
+
+            # self.sortData(fileData)
+
+            importToFuAct = QAction("Import to Fusion...", self.core.pb.mediaBrowser)
+            importToFuAct.triggered.connect(lambda: self.importToFusion())
+            menu.addAction(importToFuAct)
+
+            # shortcutAct = QAction("Save Shortcut to Resolve Project", rcmenu)
+            # shortcutAct.triggered.connect(lambda: self.saveShortcut(origin))
+            # rcmenu.addAction(shortcutAct)
+
+
+
+
     #   Builds and saves shortcut (.vbs file)
     @err_catcher(name=__name__)
     def saveShortcut(self, origin):
@@ -641,7 +719,7 @@ class Prism_ResolveShortcuts_Functions(object):
 
         #   Instantiates and calls the save from the bridge script
         shortcuts = ResolveProjectShortcuts()
-        currProjName, saveResult = shortcuts.saveProjectShortcut(savePath)
+        currProjName, currTimelineName, saveResult = shortcuts.saveProjectShortcut(savePath)
 
         if saveResult is True:
             thumbDir = tempfile.TemporaryDirectory()
@@ -649,11 +727,15 @@ class Prism_ResolveShortcuts_Functions(object):
 
             #   Adds custom description item
             detailData = {}
-            detailData["description"] = f'Shortcut to   "{currProjName}"   Resolve project'
+            if currTimelineName:
+                descriptText = f'Shortcut to   "{currProjName}:   < {currTimelineName} >"'
+            else:
+                descriptText = f'Shortcut to   "{currProjName}"'
+            detailData["description"] = descriptText
 
             thumbResult = shortcuts.getThumbnail(thumbDir.name, thumbName)
 
-            if thumbResult is True:
+            if thumbResult:
                 try:
                     pattern = os.path.join(thumbDir.name, thumbName + "_*.jpg")
                     matching_files = glob.glob(pattern)
@@ -677,7 +759,6 @@ class Prism_ResolveShortcuts_Functions(object):
                               "without thumbnail.")
 
             #   Saves the details to the versioninfo.json
-            # origin.core.saveSceneInfo(savePath, detailData, preview=None)
             origin.core.saveSceneInfo(savePath, detailData, preview=preview)
             origin.refreshScenefiles()
             
@@ -686,3 +767,10 @@ class Prism_ResolveShortcuts_Functions(object):
 
         logger.debug(fullResult)
         self.core.popup(fullResult)
+
+
+    #   Builds and saves shortcut (.vbs file)
+    @err_catcher(name=__name__)
+    def importToFusion(self):
+        
+        self.core.popup("In import")                                      #    TESTING

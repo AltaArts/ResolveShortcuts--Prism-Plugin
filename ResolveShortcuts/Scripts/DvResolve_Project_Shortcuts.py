@@ -46,9 +46,12 @@
 #
 ####################################################
 
+
+from locale import currency
 import sys
 import os
 import time
+import re
 import subprocess
 import argparse
 
@@ -146,6 +149,153 @@ class ResolveProjectShortcuts(object):
         self.resolve = dvr.scriptapp("Resolve")
 
 
+    #   Imports DVR Fusion API Script
+    def getFusion(self):
+        try:
+            import DaVinciResolveScript as dvr
+
+        except ImportError:
+            print("Failed to import DaVinciResolveScript")
+            sys.exit(1)
+
+        #   Instantiate the API
+        self.fusion = dvr.scriptapp("Fusion")
+
+
+    #   Imports imags from Prism ProjectBrowser Media tab
+    def importToFusion(self, core, imagePath, mediaBrowser=None, mode=None):
+
+        self.getFusion()
+
+        #   Gets selected image from RCL
+        if mediaBrowser:
+            sourceData = mediaBrowser.compGetImportSource()
+
+            print(f"sourceDate:  {sourceData}")
+
+            if not sourceData:
+                return
+
+        if mode == "Normal":
+            self.fusionImportSource(core, imagePath, sourceData)
+        elif mode == "Separate Passes":
+            self.fusionImportPasses(core, imagePath, sourceData)
+        else:
+            return
+        
+        
+    #   Import image from ProjectBrowser
+    def fusionImportSource(self, core, filePath, sourceData):
+        comp = self.fusion.GetCurrentComp()
+        comp.Lock()
+
+        #   Get image data
+        filePathTemplate = sourceData[0][0]
+        firstFrame = sourceData[0][1]
+        lastFrame = sourceData[0][2]
+
+        #   Frame padding integer
+        framePadding = core.framePadding
+
+        # Extract filename from the file path template
+        fileNameWithPlaceholder = os.path.basename(filePathTemplate)
+        fileName = fileNameWithPlaceholder.replace('#' * framePadding, '').replace('.', '')
+
+        # Replace the placeholder '####' with the padded first frame number
+        paddedFirstFrame = str(firstFrame).zfill(framePadding)
+        filePath = filePathTemplate.replace('#' * framePadding, paddedFirstFrame)
+
+        comp.CurrentFrame.FlowView.Select(None, False)
+
+        #   Add custon Loader tool
+        try:
+            loaderLoc = comp.MapPath('Macros:/LoaderPrism.setting')
+            loaderText = self.bmd.readfile(loaderLoc)
+            comp.Paste(loaderText)
+            tool = comp.ActiveTool()
+
+        #   Fallback to standard Loader tool
+        except:
+            print("LoaderPrism is not found.  Using normal Loader.")
+            tool = comp.AddTool("Loader", -32768, -32768)
+
+        #   Config Loader with values
+        tool.Clip[1] = filePath
+        tool.GlobalIn[1] = firstFrame
+        tool.GlobalOut[1] = lastFrame
+        tool.ClipTimeStart[1] = firstFrame
+        tool.ClipTimeEnd[1] = lastFrame
+        tool.HoldFirstFrame[1] = 0
+        tool.HoldLastFrame[1] = 0
+        tool.SetAttrs({"TOOLS_Name": "LoaderPrism"})        #   TODO - look at F2 rename
+
+        comp.Unlock()
+
+
+    #   Import image and launch EXR splitter if avail
+    def fusionImportPasses(self, core, filePath, sourceData):
+        #   Import images
+        self.fusionImportSource(core, filePath, sourceData)
+
+        # Call the splitter script after importing the source
+        comp = self.fusion.GetCurrentComp()
+
+        #   Default script name
+        script_name = "hos_SplitEXR_Ultra.lua"
+        base_dir = comp.MapPath("Scripts:")  # Base directory to start searching
+
+        script_found = False
+
+        # Traverse the base directory and its subdirectories
+        # Script usually located in ...\Script\Comp
+        for root, dirs, files in os.walk(base_dir):
+            if script_name in files:
+                script_path = os.path.join(root, script_name)
+                script_found = True
+                try:
+                    #   If found, execute the splitter script
+                    comp.RunScript(script_path)
+                except Exception as e:
+                    core.popup(f"There was an error running hos_SplitEXR_Ultra:\n\n: {e}")
+                break
+
+        if not script_found:
+            core.popup(f"'{script_name}' is not found in:\n{base_dir}.....\n\n"
+                            f"If the pass functions are desired, please place '{script_name}'\n"
+                            "in a Fusion scripts directory.")
+
+
+    # Continuously attempt to get current project while it is loading
+    def getCurrProjectLoop(self, timeout):
+        startTime = time.time()
+        currProject = None
+        try:
+            #   Starts loop
+            while currProject is None:
+                try:
+                    currProject = self.pm.GetCurrentProject()
+                    if currProject is not None:
+                        print("Current Project loaded.")
+                        #   Return once it is loaded
+                        return currProject
+                    
+                except Exception as e:
+                    # Check if timeout exceeded
+                    if time.time() - startTime > timeout:
+                        print("Timeout reached while waiting for Project to initialize.")
+                        return
+                    
+                    print(f"Error: {e}")
+                    time.sleep(1)
+
+            if currProject is None:
+                print("Could not initialize Resolve Project.")
+                return
+            
+        except Exception as e:
+            print("Error:", e)
+
+
     def openResolveProject(self, projectLoadPath, timeout=30):
         #   Starts Resolve and imports the API    
         self.startResolve(timeout)
@@ -161,9 +311,17 @@ class ResolveProjectShortcuts(object):
         self.pm = self.resolve.GetProjectManager()
         currDbName = self.pm.GetCurrentDatabase()["DbName"]
 
-        #   Splits arg path into dirs and Project name
-        path_components = projectLoadPath.split("\\")
+        # Split arg path into database, path, and optionally the timeline
+        match = re.match(r"(.*?)(<.*>)?$", projectLoadPath)
+        if not match:
+            print("Invalid project path format.")
+            return
 
+        projectPath = match.group(1).strip("\\")
+        timelineName = match.group(2).strip("<>") if match.group(2) else None
+
+        # Extract the database name
+        path_components = projectPath.split("\\")
         if len(path_components) < 2:
             print("Invalid project path format.")
             return
@@ -209,6 +367,20 @@ class ResolveProjectShortcuts(object):
         else:
             print(f"Project {projectName} loaded successfully.")
 
+        # Load the timeline if specified
+        if timelineName:
+            #   Uses a loop to instantiate project while it is loading
+            project = self.getCurrProjectLoop(timeout=30)
+            timelineCount = project.GetTimelineCount()
+            for index in range(1, timelineCount + 1):
+                timeline = project.GetTimelineByIndex(index)
+                if timeline.GetName() == timelineName:
+                    project.SetCurrentTimeline(timeline)
+                    print(f"Timeline {timelineName} loaded successfully.")
+                    break
+            else:
+                print(f"Timeline {timelineName} not found.")
+
 
     def getProjectPath(self):
         try:
@@ -223,6 +395,7 @@ class ResolveProjectShortcuts(object):
             self.currProjectName = self.currProject.GetName()
             self.currTimeline = self.currProject.GetCurrentTimeline()
             currentFolder = self.pm.GetCurrentFolder()
+            self.currTimelineName = None
 
             # Get parent folders recursively
             parentFolders = []
@@ -239,6 +412,11 @@ class ResolveProjectShortcuts(object):
 
             # Construct the project path string
             projectPath = "\\".join(parentFolders) + "\\" + self.currProjectName
+
+            # Add timeline name to the path if there is an active timeline
+            if self.currTimeline:
+                self.currTimelineName = self.currTimeline.GetName()
+                projectPath += f"\\<{self.currTimelineName}>"
 
             #   Add DB name to path
             projectPath = dbName + "\\" + projectPath
@@ -276,7 +454,6 @@ class ResolveProjectShortcuts(object):
 
     def saveProjectShortcut(self, savePath):
         self.getProjectPath()
-
         #   Gets the template .vbs from plugin folder
         templateFile = os.path.join(self.pluginPath,
                                     "Scripts",
@@ -303,9 +480,10 @@ class ResolveProjectShortcuts(object):
         except Exception as e:
             saveResult = e
         
-        return self.currProjectName, saveResult
+        return self.currProjectName, self.currTimelineName, saveResult
     
 
+#   If called from command line such as being called from the shortcut .vbs
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Resolve Project Shortcuts")
 
