@@ -48,6 +48,7 @@
 
 
 import os
+import shutil
 import glob
 import logging
 import subprocess
@@ -85,6 +86,21 @@ class Prism_ResolveShortcuts_Functions(object):
         if self.core.appPlugin.pluginName == "Resolve":
             self.core.registerCallback("openPBFileContextMenu", self.addShortcutItem, plugin=self)
             self.core.registerCallback("mediaPlayerContextMenuRequested", self.addImportItem, plugin=self)        
+
+        #   Files to be used in Integration
+        self.prismFuPrismDirFiles = ["OpenInExplorer.py",
+                                    "RefreshLocation.py",
+                                    "RefreshWriter.py",
+                                    "LoaderFromSaver.lua",
+                                    "LoaderFromSaverMstr.lua",
+                                    "RefreshMediaID.py",
+                                    "ReloadLoaders.py",
+                                    "UpdateMaster.py",
+                                    "AddLoaderPrism.lua",
+                                    "AddWritePrism.lua",
+                                    "CreateVersionInfo.py"]
+        
+        self.prismFuMacroDirFiles = ["WritePrism.setting", "LoaderPrism.setting"]
 
 
     # if returns true, the plugin will be loaded by Prism
@@ -254,7 +270,7 @@ class Prism_ResolveShortcuts_Functions(object):
 
         origin.w_resolveShortcuts.setLayout(lo_resolveShortcuts)
 
-        lo_resolveShortcuts.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
+        lo_resolveShortcuts.addItem(QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Fixed))
 
         # ENABLE SHORTCUT FUNCTIONS CHECKBOX
         lo_topBar = QHBoxLayout()
@@ -262,7 +278,7 @@ class Prism_ResolveShortcuts_Functions(object):
         self.chb_enableShortcutFunctions = QCheckBox("Enable Resolve Shortcut Functions")
         lo_topBar.addWidget(self.chb_enableShortcutFunctions)
 
-        lo_topBar.addItem(QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        lo_topBar.addItem(QSpacerItem(20, 10, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
         l_enviroVarSet = QLabel("Enviro Variable is:")
         lo_topBar.addWidget(l_enviroVarSet)
@@ -278,7 +294,7 @@ class Prism_ResolveShortcuts_Functions(object):
         self.but_removeEnviroVar.clicked.connect(self.removeEnviroVar)
         lo_topBar.addWidget(self.but_removeEnviroVar)
 
-        lo_topBar.addItem(QSpacerItem(60, 20, QSizePolicy.Fixed, QSizePolicy.Minimum))
+        lo_topBar.addItem(QSpacerItem(60, 10, QSizePolicy.Fixed, QSizePolicy.Minimum))
 
         lo_resolveShortcuts.addLayout(lo_topBar)
 
@@ -303,10 +319,11 @@ class Prism_ResolveShortcuts_Functions(object):
         lo_resolveConfig.addLayout(lo_resolveEXE)
 
         l_resolveExample = QLabel("             (example:  C:/Program Files/Blackmagic Design/DaVinci Resolve/Resolve.exe)")
+        l_resolveExample.setStyleSheet("font-size: 8pt;")
         lo_resolveConfig.addWidget(l_resolveExample)
 
 
-        lo_resolveConfig.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
+        lo_resolveConfig.addItem(QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Fixed))
 
 
         # RESOLVE API SECTION
@@ -326,10 +343,11 @@ class Prism_ResolveShortcuts_Functions(object):
         lo_resolveConfig.addLayout(lo_resolveApiScript)
 
         l_apiScriptExample = QLabel("             (example:  C:/ProgramData/Blackmagic Design/DaVinci Resolve/Support/Developer/Scripting/Modules)")
+        l_apiScriptExample.setStyleSheet("font-size: 8pt;")
         lo_resolveConfig.addWidget(l_apiScriptExample)
 
 
-        lo_resolveConfig.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
+        lo_resolveConfig.addItem(QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Fixed))
 
 
         # PRISM PYTHON SECTION
@@ -349,10 +367,11 @@ class Prism_ResolveShortcuts_Functions(object):
         lo_resolveConfig.addLayout(lo_prismPython)
 
         l_prismPythonExample = QLabel("             (example:  C:/Prism2/Python311/python.exe)")
+        l_prismPythonExample.setStyleSheet("font-size: 8pt;")
         lo_resolveConfig.addWidget(l_prismPythonExample)
 
 
-        lo_resolveConfig.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
+        lo_resolveConfig.addItem(QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Fixed))
 
 
         # PLUGIN LOCATION SECTION
@@ -372,6 +391,7 @@ class Prism_ResolveShortcuts_Functions(object):
         lo_resolveConfig.addLayout(lo_pluginLoc)
 
         l_pluginLocExample = QLabel("             (example:  C:/ProgramData/Prism2/plugins/CustomPlugins/ResolveShortcuts)")
+        l_pluginLocExample.setStyleSheet("font-size: 8pt;")
         lo_resolveConfig.addWidget(l_pluginLocExample)
 
 
@@ -379,22 +399,50 @@ class Prism_ResolveShortcuts_Functions(object):
 
 
         # BOTTOM BAR
-        lo_btmBar = QHBoxLayout()
+        lo_btmBar1 = QHBoxLayout()
 
         self.chb_useIcon = QCheckBox("Associate Icon with shortcut filetype")
-        lo_btmBar.addWidget(self.chb_useIcon)
+        lo_btmBar1.addWidget(self.chb_useIcon)
 
-        lo_btmBar.addItem(QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        lo_btmBar1.addItem(QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
         l_reset = QLabel("Reset Locations to default:  ")
-        lo_btmBar.addWidget(l_reset)
+        lo_btmBar1.addWidget(l_reset)
 
         but_reset = QPushButton("Reset")
         but_reset.clicked.connect(self.resetPaths)
-        lo_btmBar.addWidget(but_reset)
-        lo_btmBar.addItem(QSpacerItem(60, 20, QSizePolicy.Fixed, QSizePolicy.Minimum))
-        lo_resolveConfig.addLayout(lo_btmBar)
+        lo_btmBar1.addWidget(but_reset)
+        lo_btmBar1.addItem(QSpacerItem(60, 20, QSizePolicy.Fixed, QSizePolicy.Minimum))
+        lo_resolveConfig.addLayout(lo_btmBar1)
 
+        lo_resolveConfig.addLayout(lo_btmBar1)
+
+        lo_resolveConfig.addItem(QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Fixed))
+
+        lo_btmBar2 = QHBoxLayout()
+
+        l_fusionToolsAdd = QLabel("Fusion Tools:  ")
+        lo_btmBar2.addWidget(l_fusionToolsAdd)
+
+        self.l_fusionToolsStatus = QLabel("")
+        lo_btmBar2.addWidget(self.l_fusionToolsStatus)
+
+        self.but_addFusionTools = QPushButton("   ADD   ")
+        self.but_addFusionTools.clicked.connect(self.addFusionTools)
+        lo_btmBar2.addWidget(self.but_addFusionTools)
+
+        self.but_removeFusionTools = QPushButton("   Remove   ")
+        self.but_removeFusionTools.clicked.connect(self.removeFusionTools)
+        lo_btmBar2.addWidget(self.but_removeFusionTools)
+
+        self.but_resetFusionTools = QPushButton("   Reset   ")
+        self.but_resetFusionTools.clicked.connect(self.resetFusionTools)
+        lo_btmBar2.addWidget(self.but_resetFusionTools)
+
+        lo_btmBar2.addItem(QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+
+        lo_resolveConfig.addLayout(lo_btmBar2)
+        self.gb_resolveConfig.setLayout(lo_resolveConfig)
         lo_resolveShortcuts.addWidget(self.gb_resolveConfig)
 
         # Add an expanding spacer at the bottom
@@ -548,6 +596,22 @@ class Prism_ResolveShortcuts_Functions(object):
         else:
             self.gb_resolveConfig.setEnabled(False)
 
+        toolsStatus = self.checkFusionTools()
+
+        toolsButtons = [self.but_addFusionTools, self.but_removeFusionTools, self.but_resetFusionTools]
+        for button in toolsButtons:
+            button.hide()
+
+        self.l_fusionToolsStatus.setText(toolsStatus)
+
+        if toolsStatus == "Installed":
+            self.but_removeFusionTools.show()
+        elif toolsStatus == "Not Installed":
+            self.but_addFusionTools.show()
+        else:
+            self.but_resetFusionTools.show()
+
+
         
     #   Checks if required enviro variable exists
     @err_catcher(name=__name__)
@@ -605,16 +669,131 @@ class Prism_ResolveShortcuts_Functions(object):
                     logger.error(e)
 
 
+
+
+
+    #   Checks if Fusion tools have been installed
+    @err_catcher(name=__name__)
+    def getFusionToolsLocs(self):
+        toolsDir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "FusionTools")
+
+        baseInstallDir = os.path.join(os.environ["PROGRAMDATA"],
+                                "Blackmagic Design",
+                                "DaVinci Resolve",
+                                "Fusion")
+
+        scriptDir = os.path.join(baseInstallDir, "Scripts")
+        prismScriptDir = os.path.join(scriptDir, "Prism")
+        prismMacrosDir = os.path.join(baseInstallDir, "Macros", "Prism")
+
+        return toolsDir, prismScriptDir, prismMacrosDir
+    
+
+    #   Checks if Fusion tools have been installed
+    @err_catcher(name=__name__)
+    def checkFusionTools(self):
+
+        _, prismScriptDir, prismMacrosDir = self.getFusionToolsLocs()
+
+        macro_files = [
+            file for file in self.prismFuMacroDirFiles
+            if os.path.exists(os.path.join(prismMacrosDir, file))
+            ]
+        
+        script_files = [
+            file for file in self.prismFuPrismDirFiles
+            if os.path.exists(os.path.join(prismScriptDir, file))
+            ]
+
+        expectCount = len(self.prismFuMacroDirFiles) + len(self.prismFuPrismDirFiles)
+        foundCount = len(macro_files) + len(script_files)
+
+        if foundCount == 0:
+            return "Not Installed"
+        if foundCount == expectCount:
+            return "Installed"
+        else:
+            return "Error"
+
+
+    #   Adds custom tools to DVR Fusion install
+    @err_catcher(name=__name__)
+    def addFusionTools(self):
+
+        toolsDir, prismScriptDir, prismMacrosDir = self.getFusionToolsLocs()
+
+        try:
+            if not os.path.exists(prismMacrosDir):
+                os.mkdir(prismMacrosDir)
+
+            for file in self.prismFuMacroDirFiles:
+                fromPath = os.path.join(toolsDir, file)
+                toPath = os.path.join(prismMacrosDir, file)
+                shutil.copy(fromPath, toPath)
+                
+
+            if not os.path.exists(prismScriptDir):
+                os.mkdir(prismScriptDir)
+
+            for file in self.prismFuPrismDirFiles:
+                fromPath = os.path.join(toolsDir, file)
+                toPath = os.path.join(prismScriptDir, file)  
+                shutil.copy(fromPath, toPath)
+
+                with open(toPath, "r") as fileData:
+                    fileStr = fileData.read()
+                    fileStr = fileStr.replace(
+                        "PRISMROOT", '"%s"' % self.core.prismRoot.replace(
+                            "\\", "/")
+                        )
+
+                with open(toPath, "w") as fileData:
+                    fileData.write(fileStr)
+
+        except Exception as e:
+            self.core.popup(e)                      # TESTING       TODO
+
+        self.refreshUI()
+
+
+    #   Removes tools from DVR Fusion install
+    @err_catcher(name=__name__)
+    def removeFusionTools(self):
+
+        _, prismScriptDir, prismMacrosDir = self.getFusionToolsLocs()
+
+        try:
+            shutil.rmtree(prismScriptDir)
+            shutil.rmtree(prismMacrosDir)
+
+        except Exception as e:
+            self.core.popup(e)                      # TESTING       TODO
+
+        self.refreshUI()
+
+
+    #   Resets tools in DVR Fusion install
+    @err_catcher(name=__name__)
+    def resetFusionTools(self):
+
+        self.removeFusionTools()
+        self.addFusionTools()
+
+
+
     #   Adds right-click menu item
     @err_catcher(name=__name__)
     def addShortcutItem(self, origin, rcmenu, filePath):
+        #   Gets origin object for popup parent
+        self.originBrowser = origin
+
         if self.shortcutsEnabled:
             shortcutAct = QAction("Save Shortcut to Resolve Project", rcmenu)
             shortcutAct.triggered.connect(lambda: self.saveShortcut(origin))
             rcmenu.addAction(shortcutAct)
 
 
-    #   Adds right-click menu item                                      TODO   IN PROGRESS
+    #   Adds right-click menu Import Images item
     @err_catcher(name=__name__)
     def addImportItem(self, origin, menu):
         if self.shortcutsEnabled:
@@ -633,63 +812,58 @@ class Prism_ResolveShortcuts_Functions(object):
             if not type(origin.origin).__name__ == "MediaBrowser":
                 return
 
+            #   Return if not a media version
             version = origin.origin.getCurrentVersion()
             if not version:
                 return 
-
-            self.menuContext = "Media Files:"
-            fileData = None
-
             if not origin.seq:
                 return
 
-            # try:
-            #     logger.debug("Loading Media Data")
-            #     #   Retrieves some File Data
-            #     rawData = origin.getSelectedContexts()
-            #     if rawData and isinstance(rawData[0], dict):
-            #         fileData = rawData[0]
-            #     else:
-            #         fileData = {}
+            fileData = None
 
-            #     fileData["sourceDir"] = fileData["path"]
-            #     fileData["extension"] = os.path.splitext(fileData["source"])[1]
+            #   Get media info data
+            try:
+                logger.debug("Loading Media Data")
+                #   Retrieves some File Data
+                rawData = origin.getSelectedContexts()
+                if rawData and isinstance(rawData[0], dict):
+                    fileData = rawData[0]
+                else:
+                    fileData = {}
 
-            # except Exception as e:
-            #     msg = f"Error Getting File Context Info {str(e)}"
-            #     self.core.popup(msg)
-            #     logger.warning(f"ERROR: Cannot Load Media Data: {e}")
+                fileData["sourceDir"] = fileData["path"]
+                fileData["extension"] = os.path.splitext(fileData["source"])[1]
 
-            # #   If the item is a single file
-            # if len(origin.seq) < 2:
-            #     self.singleFileMode = True
-            #     fileData["sourcePath"] = origin.seq[0]
-            #     fileData["sourceFilename"] = os.path.basename(origin.seq[0])
+            except Exception as e:
+                msg = f"Error Getting File Context Info {str(e)}"
+                self.core.popup(msg)
+                logger.warning(f"ERROR: Cannot Load Media Data: {e}")
 
-            # #   If the item is an Image Sequence
-            # elif len(origin.seq) > 1:
-            #     self.singleFileMode = False
-            #     fileData["currentFrame"] = os.path.basename(origin.seq[origin.getCurrentFrame()])
-            #     filenameNoExt = os.path.splitext(fileData["currentFrame"])[0]
-            #     fileData["frameNumber"] = os.path.splitext(filenameNoExt)[1]
-            #     fileData["sourceFilename"] = fileData["source"]
+            #   If the item is a single file
+            if len(origin.seq) < 2:
+                self.singleFileMode = True
+                fileData["sourcePath"] = origin.seq[0]
+                fileData["sourceFilename"] = os.path.basename(origin.seq[0])
 
-            #     fileList = []
-            #     for file in origin.seq:
-            #         fileList.append(file)
-            #     fileData["sourcePath"] = fileList
+            #   If the item is an Image Sequence
+            elif len(origin.seq) > 1:
+                self.singleFileMode = False
+                fileData["currentFrame"] = os.path.basename(origin.seq[origin.getCurrentFrame()])
+                filenameNoExt = os.path.splitext(fileData["currentFrame"])[0]
+                fileData["frameNumber"] = os.path.splitext(filenameNoExt)[1]
+                fileData["sourceFilename"] = fileData["source"]
 
-            # self.sortData(fileData)
+                fileList = []
+                for file in origin.seq:
+                    fileList.append(file)
+                fileData["sourcePath"] = fileList
 
+            mediaBrowser = origin
+
+            #   Add right-click item
             importToFuAct = QAction("Import to Fusion...", self.core.pb.mediaBrowser)
-            importToFuAct.triggered.connect(lambda: self.importToFusion())
+            importToFuAct.triggered.connect(lambda: self.importToFusion(mediaBrowser, fileData))
             menu.addAction(importToFuAct)
-
-            # shortcutAct = QAction("Save Shortcut to Resolve Project", rcmenu)
-            # shortcutAct.triggered.connect(lambda: self.saveShortcut(origin))
-            # rcmenu.addAction(shortcutAct)
-
-
 
 
     #   Builds and saves shortcut (.vbs file)
@@ -733,6 +907,7 @@ class Prism_ResolveShortcuts_Functions(object):
                 descriptText = f'Shortcut to   "{currProjName}"'
             detailData["description"] = descriptText
 
+            #   Get thumbnail preview from Resolve
             thumbResult = shortcuts.getThumbnail(thumbDir.name, thumbName)
 
             if thumbResult:
@@ -766,11 +941,32 @@ class Prism_ResolveShortcuts_Functions(object):
             fullResult = f"Failed to save shortcut to {currProjName}:\n\n{saveResult}"
 
         logger.debug(fullResult)
-        self.core.popup(fullResult)
+        self.core.popup(fullResult, parent=self.originBrowser)
 
 
-    #   Builds and saves shortcut (.vbs file)
+    #   Imports media from ProjectBrowser in Resolve
     @err_catcher(name=__name__)
-    def importToFusion(self):
+    def importToFusion(self, mediaBrowser, fileData):
+        #   Imports bridge script with the Resolve API
+        try:
+            from DvResolve_Project_Shortcuts import ResolveProjectShortcuts
+            logger.debug("Imported ResolveShortcuts")
+
+        except Exception as e:
+            logger.warning("Failed to import ResolveShortcuts module")
+            self.core.popup("Failed to import ResolveShortcuts module")
         
-        self.core.popup("In import")                                      #    TESTING
+        #   Instantiates and calls the save from the bridge script
+        shortcuts = ResolveProjectShortcuts()
+
+        #   Adds simple UI popup
+        fString = "Please select an import option:"
+        buttons = ["Normal", "Separate Passes", "Cancel"]
+        mode = self.core.popupQuestion(fString, buttons=buttons, icon=QMessageBox.NoIcon, parent=mediaBrowser)
+
+        if mode in ["Normal", "Separate Passes"]:
+            core = self.core
+
+            result = shortcuts.importToFusion(core, fileData, mediaBrowser=mediaBrowser, mode=mode)
+
+            self.core.popup(result)

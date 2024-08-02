@@ -169,30 +169,89 @@ class ResolveProjectShortcuts(object):
         #   Gets selected image from RCL
         if mediaBrowser:
             sourceData = mediaBrowser.compGetImportSource()
-
-            print(f"sourceDate:  {sourceData}")
-
             if not sourceData:
                 return
 
         if mode == "Normal":
-            self.fusionImportSource(core, imagePath, sourceData)
+            result = self.fusionImportSource(core, imagePath, sourceData)
         elif mode == "Separate Passes":
-            self.fusionImportPasses(core, imagePath, sourceData)
+            result = self.fusionImportPasses(core, imagePath, sourceData)
         else:
-            return
+            result = "Error:  Unknown command"
+        
+        return result
         
         
+    # Looks through all dirs in Fusion Path Map to find tool
+    def findMacroPath(self, macroName):
+        # Keys for the path mappings to retrieve
+        pathKeys = [
+            "Global.Paths.Map.Macros:",
+            "Global.Paths.Map.UserPaths:",
+            "Global.Paths.Map.Reactor:"
+        ]
+
+        # Iterate over each path key and retrieve the directories
+        for key in pathKeys:
+            rawPaths = self.fusion.GetPrefs(key)
+
+            if rawPaths:
+                aliases = rawPaths.split(';')
+                for alias in aliases:
+                    resolvedPath = self.fusion.MapPath(alias)
+                    for root, dirs, files in os.walk(resolvedPath):
+                        if macroName in files:
+                            macroPath = os.path.join(root, macroName)
+
+                            return macroPath
+        
+        return None
+
+
+    #   Gets the various script paths from the Fusion preferences Path Maps
+    def getScriptDirList(self):
+
+        scriptDirList = []
+
+        # Keys for the path mappings to retrieve
+        pathKeys = [
+            "Global.Paths.Map.Scripts:",
+            "Global.Paths.Map.UserPaths:",
+            "Global.Paths.Map.Reactor:"
+            ]
+
+        # Iterate over each path key and retrieve the directories
+        for key in pathKeys:
+            rawPaths = self.fusion.GetPrefs(key)
+            if rawPaths:
+                aliases = rawPaths.split(';')
+                for alias in aliases:
+                    resolvedPath = self.fusion.MapPath(alias)
+                    scriptDirList.append(resolvedPath)
+
+        return scriptDirList
+    
+
     #   Import image from ProjectBrowser
     def fusionImportSource(self, core, filePath, sourceData):
         comp = self.fusion.GetCurrentComp()
         comp.Lock()
 
         #   Get image data
-        filePathTemplate = sourceData[0][0]
-        firstFrame = sourceData[0][1]
-        lastFrame = sourceData[0][2]
+        try:
+            filePathTemplate = sourceData[0][0]
+            firstFrame = sourceData[0][1]
+            lastFrame = sourceData[0][2]
 
+            _, ext = os.path.splitext(filePathTemplate)
+        except:
+            return "ERROR:  Image data cannot be decoded."
+
+        if ext.lower() not in [".exr", ".dpx", ".png", ".jpg", ".jpeg", ".raw", ".ipl", ".tga", ".bmp"]:
+            nonSequenceText = ("Annoyingly, Resolve Fusion's Loaders only support images sequences.\n"
+                                "Please use MediaIn tool to load video clips.")
+            return nonSequenceText
+    
         #   Frame padding integer
         framePadding = core.framePadding
 
@@ -208,60 +267,77 @@ class ResolveProjectShortcuts(object):
 
         #   Add custon Loader tool
         try:
-            loaderLoc = comp.MapPath('Macros:/LoaderPrism.setting')
-            loaderText = self.bmd.readfile(loaderLoc)
-            comp.Paste(loaderText)
-            tool = comp.ActiveTool()
+            macroLoc = self.findMacroPath("LoaderPrism.setting")
+            if macroLoc:
+                loaderText = bmd.readfile(macroLoc)
+                comp.Paste(loaderText)
+                tool = comp.ActiveTool()
 
+                result = "Image imported with LoaderPrism"
+
+            else:
+                raise FileNotFoundError("LoaderPrism setting not found in any macro paths")
+            
         #   Fallback to standard Loader tool
         except:
             print("LoaderPrism is not found.  Using normal Loader.")
             tool = comp.AddTool("Loader", -32768, -32768)
 
+            result = "Image imported with Fusion Loader"
+
         #   Config Loader with values
-        tool.Clip[1] = filePath
-        tool.GlobalIn[1] = firstFrame
-        tool.GlobalOut[1] = lastFrame
-        tool.ClipTimeStart[1] = firstFrame
-        tool.ClipTimeEnd[1] = lastFrame
-        tool.HoldFirstFrame[1] = 0
-        tool.HoldLastFrame[1] = 0
-        tool.SetAttrs({"TOOLS_Name": "LoaderPrism"})        #   TODO - look at F2 rename
+        try:
+            tool.Clip[1] = filePath
+            tool.GlobalIn[1] = firstFrame
+            tool.GlobalOut[1] = lastFrame
+            tool.ClipTimeStart[1] = firstFrame
+            tool.ClipTimeEnd[1] = lastFrame
+            tool.HoldFirstFrame[1] = 0
+            tool.HoldLastFrame[1] = 0
+            tool.SetAttrs({"TOOLS_Name": "LoaderPrism"})        #   TODO - look at F2 rename
+
+        except:
+            result = "ERROR:  There was an issue configuring Loader.  It may have worked though."
+            
 
         comp.Unlock()
+
+        return result
 
 
     #   Import image and launch EXR splitter if avail
     def fusionImportPasses(self, core, filePath, sourceData):
         #   Import images
-        self.fusionImportSource(core, filePath, sourceData)
+        result = self.fusionImportSource(core, filePath, sourceData)
 
         # Call the splitter script after importing the source
         comp = self.fusion.GetCurrentComp()
 
         #   Default script name
-        script_name = "hos_SplitEXR_Ultra.lua"
-        base_dir = comp.MapPath("Scripts:")  # Base directory to start searching
+        scriptName = "hos_SplitEXR_Ultra.lua"
+        scriptFound = False
 
-        script_found = False
-
-        # Traverse the base directory and its subdirectories
-        # Script usually located in ...\Script\Comp
-        for root, dirs, files in os.walk(base_dir):
-            if script_name in files:
-                script_path = os.path.join(root, script_name)
-                script_found = True
-                try:
-                    #   If found, execute the splitter script
-                    comp.RunScript(script_path)
-                except Exception as e:
-                    core.popup(f"There was an error running hos_SplitEXR_Ultra:\n\n: {e}")
+        # Traverse the various dirs and attempt to find the script
+        for scriptDir in self.getScriptDirList():
+            for root, dirs, files in os.walk(scriptDir):
+                if scriptName in files:
+                    scriptPath = os.path.join(root, scriptName)
+                    scriptFound = True
+                    try:
+                        # If found, execute the splitter script
+                        comp.RunScript(scriptPath)
+                    except Exception as e:
+                        self.core.popup(f"There was an error running hos_SplitEXR_Ultra:\n\n: {e}")
+                    break
+            if scriptFound:
                 break
 
-        if not script_found:
-            core.popup(f"'{script_name}' is not found in:\n{base_dir}.....\n\n"
-                            f"If the pass functions are desired, please place '{script_name}'\n"
+        if not scriptFound:
+            self.core.popup(f"'{scriptName}' is not found.....\n\n"
+                            f"If the pass functions are desired, please place '{scriptName}'\n"
                             "in a Fusion scripts directory.")
+            
+        return result
 
 
     # Continuously attempt to get current project while it is loading
@@ -368,9 +444,10 @@ class ResolveProjectShortcuts(object):
 
         # Load the timeline if specified
         if timelineName:
-            #   Uses a loop to instantiate project while it is loading
+            #   Uses a loop to instantiate project while waiting to loading
             project = self.getCurrProjectLoop(timeout=30)
             timelineCount = project.GetTimelineCount()
+            #   Cycle through timelines to find match
             for index in range(1, timelineCount + 1):
                 timeline = project.GetTimelineByIndex(index)
                 if timeline.GetName() == timelineName:
