@@ -1,0 +1,91 @@
+--[[
+# -*- coding: utf-8 -*-
+#
+####################################################
+#
+# PRISM - Pipeline for animation and VFX projects
+#
+# www.prism-pipeline.com
+#
+# contact: contact@prism-pipeline.com
+#
+####################################################
+#
+#
+# Copyright (C) 2016-2023 Richard Frangenberg
+# Copyright (C) 2023 Prism Software GmbH
+#
+# Licensed under GNU LGPL-3.0-or-later
+#
+# This file is part of Prism.
+#
+# Prism is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Prism is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with Prism.  If not, see <https://www.gnu.org/licenses/>.
+###########################################################################
+#
+#                BMD Fusion Studio Plugin for Prism2
+#
+#                        Original code by:
+#                          EmberLightVFX
+#           https://github.com/EmberLightVFX/Fusion-for-Prism
+#
+#
+#                       Updated for Prism2 by:
+#                           Joshua Breckeen
+#                              Alta Arts
+#                          josh@alta-arts.com
+#
+###########################################################################
+]]
+
+{
+	Tools = ordered() {
+		LoaderPrism = Loader {
+			Clips = {
+				Clip {
+					ID = "",
+					Filename = "",
+					FormatID = "OpenEXRFormat",
+					Length = 0,
+					Multiframe = true,
+					TrimIn = 0,
+					TrimOut = 0,
+					ExtendFirst = 0,
+					ExtendLast = 0,
+					Loop = 1,
+					AspectMode = 0,
+					Depth = 0,
+					TimeCode = 0,
+					GlobalStart = 1,
+					GlobalEnd = 1
+				}
+			},
+			CtrlWZoom = false,
+			Inputs = {
+				["Gamut.SLogVersion"] = Input { Value = FuID { "SLog2" }, },
+				["Clip1.QuickTimeMovies.Advanced"] = Input { Value = 1, },
+			},
+			ViewInfo = OperatorInfo { Pos = { 162.667, -15.6667 } },
+			UserControls = ordered() {
+				ML = {
+					LINKS_Name = "Reload Loader",
+					ICS_ControlPage = "File",
+					BTNCS_Execute = " tool = comp.ActiveTool; comp:RunScript(\"Scripts:Prism/ReloadLoaders.py\", tool) ",
+					LINKID_DataType = "Number",
+					INPID_InputControl = "ButtonControl",
+					INP_Default = 0,
+				}
+			}
+		}
+	}
+}
