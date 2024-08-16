@@ -55,7 +55,7 @@ import subprocess
 import argparse
 
 
-class ResolveProjectShortcuts(object):
+class ResolveShortcuts(object):
     def __init__(self):
         self.pluginPath = os.path.dirname(os.path.dirname(__file__))
         self.settingsFile = os.path.join(self.pluginPath, "ResolveShortcuts_Config.txt")
@@ -89,6 +89,8 @@ class ResolveProjectShortcuts(object):
                         resolveEXE = value
                     elif key == "current_plugin_version":
                         self.pluginVersion = value
+                    elif key == "current_project":
+                        self.currScenefile = value
 
             return resolveEXE, dvr_script_path
 
@@ -148,198 +150,6 @@ class ResolveProjectShortcuts(object):
         self.resolve = dvr.scriptapp("Resolve")
 
 
-    #   Imports DVR Fusion API Script
-    def getFusion(self):
-        try:
-            import DaVinciResolveScript as dvr
-
-        except ImportError:
-            print("Failed to import DaVinciResolveScript")
-            sys.exit(1)
-
-        #   Instantiate the API
-        self.fusion = dvr.scriptapp("Fusion")
-
-
-    #   Imports imags from Prism ProjectBrowser Media tab
-    def importToFusion(self, core, imagePath, mediaBrowser=None, mode=None):
-
-        self.getFusion()
-
-        #   Gets selected image from RCL
-        if mediaBrowser:
-            sourceData = mediaBrowser.compGetImportSource()
-            if not sourceData:
-                return
-
-        if mode == "Normal":
-            result = self.fusionImportSource(core, imagePath, sourceData)
-        elif mode == "Separate Passes":
-            result = self.fusionImportPasses(core, imagePath, sourceData)
-        else:
-            result = "Error:  Unknown command"
-        
-        return result
-        
-        
-    # Looks through all dirs in Fusion Path Map to find tool
-    def findMacroPath(self, macroName):
-        # Keys for the path mappings to retrieve
-        pathKeys = [
-            "Global.Paths.Map.Macros:",
-            "Global.Paths.Map.UserPaths:",
-            "Global.Paths.Map.Reactor:"
-        ]
-
-        # Iterate over each path key and retrieve the directories
-        for key in pathKeys:
-            rawPaths = self.fusion.GetPrefs(key)
-
-            if rawPaths:
-                aliases = rawPaths.split(';')
-                for alias in aliases:
-                    resolvedPath = self.fusion.MapPath(alias)
-                    for root, dirs, files in os.walk(resolvedPath):
-                        if macroName in files:
-                            macroPath = os.path.join(root, macroName)
-
-                            return macroPath
-        
-        return None
-
-
-    #   Gets the various script paths from the Fusion preferences Path Maps
-    def getScriptDirList(self):
-
-        scriptDirList = []
-
-        # Keys for the path mappings to retrieve
-        pathKeys = [
-            "Global.Paths.Map.Scripts:",
-            "Global.Paths.Map.UserPaths:",
-            "Global.Paths.Map.Reactor:"
-            ]
-
-        # Iterate over each path key and retrieve the directories
-        for key in pathKeys:
-            rawPaths = self.fusion.GetPrefs(key)
-            if rawPaths:
-                aliases = rawPaths.split(';')
-                for alias in aliases:
-                    resolvedPath = self.fusion.MapPath(alias)
-                    scriptDirList.append(resolvedPath)
-
-        return scriptDirList
-    
-
-    #   Import image from ProjectBrowser
-    def fusionImportSource(self, core, filePath, sourceData):
-        comp = self.fusion.GetCurrentComp()
-        comp.Lock()
-
-        #   Get image data
-        try:
-            filePathTemplate = sourceData[0][0]
-            firstFrame = sourceData[0][1]
-            lastFrame = sourceData[0][2]
-
-            _, ext = os.path.splitext(filePathTemplate)
-        except:
-            return "ERROR:  Image data cannot be decoded."
-
-        if ext.lower() not in [".exr", ".dpx", ".png", ".jpg", ".jpeg", ".raw", ".ipl", ".tga", ".bmp"]:
-            nonSequenceText = ("Annoyingly, Resolve Fusion's Loaders only support images sequences.\n"
-                                "Please use MediaIn tool to load video clips.")
-            return nonSequenceText
-    
-        #   Frame padding integer
-        framePadding = core.framePadding
-
-        # Extract filename from the file path template
-        fileNameWithPlaceholder = os.path.basename(filePathTemplate)
-        fileName = fileNameWithPlaceholder.replace('#' * framePadding, '').replace('.', '')
-
-        # Replace the placeholder '####' with the padded first frame number
-        paddedFirstFrame = str(firstFrame).zfill(framePadding)
-        filePath = filePathTemplate.replace('#' * framePadding, paddedFirstFrame)
-
-        comp.CurrentFrame.FlowView.Select(None, False)
-
-        #   Add custon Loader tool
-        try:
-            macroLoc = self.findMacroPath("LoaderPrism.setting")
-            if macroLoc:
-                loaderText = bmd.readfile(macroLoc)
-                comp.Paste(loaderText)
-                tool = comp.ActiveTool()
-
-                result = "Image imported with LoaderPrism"
-
-            else:
-                raise FileNotFoundError("LoaderPrism setting not found in any macro paths")
-            
-        #   Fallback to standard Loader tool
-        except:
-            print("LoaderPrism is not found.  Using normal Loader.")
-            tool = comp.AddTool("Loader", -32768, -32768)
-
-            result = "Image imported with Fusion Loader"
-
-        #   Config Loader with values
-        try:
-            tool.Clip[1] = filePath
-            tool.GlobalIn[1] = firstFrame
-            tool.GlobalOut[1] = lastFrame
-            tool.ClipTimeStart[1] = firstFrame
-            tool.ClipTimeEnd[1] = lastFrame
-            tool.HoldFirstFrame[1] = 0
-            tool.HoldLastFrame[1] = 0
-            tool.SetAttrs({"TOOLS_Name": "LoaderPrism"})        #   TODO - look at F2 rename
-
-        except:
-            result = "ERROR:  There was an issue configuring Loader.  It may have worked though."
-            
-
-        comp.Unlock()
-
-        return result
-
-
-    #   Import image and launch EXR splitter if avail
-    def fusionImportPasses(self, core, filePath, sourceData):
-        #   Import images
-        result = self.fusionImportSource(core, filePath, sourceData)
-
-        # Call the splitter script after importing the source
-        comp = self.fusion.GetCurrentComp()
-
-        #   Default script name
-        scriptName = "hos_SplitEXR_Ultra.lua"
-        scriptFound = False
-
-        # Traverse the various dirs and attempt to find the script
-        for scriptDir in self.getScriptDirList():
-            for root, dirs, files in os.walk(scriptDir):
-                if scriptName in files:
-                    scriptPath = os.path.join(root, scriptName)
-                    scriptFound = True
-                    try:
-                        # If found, execute the splitter script
-                        comp.RunScript(scriptPath)
-                    except Exception as e:
-                        self.core.popup(f"There was an error running hos_SplitEXR_Ultra:\n\n: {e}")
-                    break
-            if scriptFound:
-                break
-
-        if not scriptFound:
-            self.core.popup(f"'{scriptName}' is not found.....\n\n"
-                            f"If the pass functions are desired, please place '{scriptName}'\n"
-                            "in a Fusion scripts directory.")
-            
-        return result
-
-
     # Continuously attempt to get current project while it is loading
     def getCurrProjectLoop(self, timeout):
         startTime = time.time()
@@ -371,7 +181,7 @@ class ResolveProjectShortcuts(object):
             print("Error:", e)
 
 
-    def openResolveProject(self, projectLoadPath, timeout=30):
+    def openResolveProject(self, projectLoadPath, vbsFile, timeout=30):
         #   Starts Resolve and imports the API    
         self.startResolve(timeout)
 
@@ -559,6 +369,9 @@ class ResolveProjectShortcuts(object):
         return self.currProjectName, self.currTimelineName, saveResult
     
 
+
+
+
 #   If called from command line such as being called from the shortcut .vbs
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Resolve Project Shortcuts")
@@ -569,16 +382,18 @@ if __name__ == "__main__":
                         )
     
     parser.add_argument("path", help="Path to project or file")
+    parser.add_argument("vbsFile", help="Name of the .vbs file that called this script")
     
     args = parser.parse_args()
 
-    resolveShortcuts = ResolveProjectShortcuts()
+    resolveShortcuts = ResolveShortcuts()
 
     if args.mode == "load":
         projectPath = args.path
+        vbsFile = args.vbsFile
 
         # Call the function to load the project in Resolve with a timeout of 30 seconds
-        resolveShortcuts.openResolveProject(projectPath, timeout=30)
+        resolveShortcuts.openResolveProject(projectPath, vbsFile, timeout=30)
 
     elif args.mode == "save":
         savePath = args.path
