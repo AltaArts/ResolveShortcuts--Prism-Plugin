@@ -11,16 +11,16 @@ https://prism-pipeline.com/
 
 ## **Overview**
 
-The ResolveShortcuts plugin adds the ability to save a shortcut to a project located in Davinci Resolve's internal database.  The shortcut file will be saved in the scenefiles alongside other versioned scenefiles.  This allows the abilty to directly open the project from Prism's Project Browser mimicking other DCC scenefiles without having to start Resolve, and navigate its Project Manager to find the project.
+The ResolveShortcuts plugin adds the ability to save a shortcut to a project located in Davinci Resolve's internal database.  The shortcut file will be saved in the scenefiles alongside other versioned scenefiles.  This allows the abilty to directly open the project (and timeline if it exists) from Prism's Project Browser mimicking other DCC scenefiles without having to start Resolve, and navigate its Project Manager to find the project.
 
-The shortcut file is just a small Visual Basic script file (.vbs) that contains the "path" to the project that will start Resolve and open the project.
+The shortcut file is just a small Visual Basic script file (.vbs) that contains the "path" to the project (and timeline) that will start Resolve and open the project.
 
 A shortcut can be saved into Prism by opening the Prism Project Browser from the Resolve Prism tool, and right clicking.  This opens the default Prism menu, with the added item "Save Shortcut to Resolve Project".
 
 ## **Notes**
 
 - Two things need to be enabled for the plugin to function: the "Enabled" checkbox and the environment variable set.
-- This does not handle versioning as would be normal for scenefiles.  The shortcut just points to the project in Resolve.
+- This does not handle versioning as would be normal for scenefiles.  The shortcut just points to the project (and timeline) in Resolve.  A user can use a workflow where different timeline versions are saved as different shortcuts which will mimic "normal" versioning.
 - The shortcut files are small Visual Basic script files and thus the system's security preferences must allow .vbs scripts to run.
 - The plugin will attempt to set the required filepaths during first run of the plugin.  This assumes that Resolve is installed in the default location.  If the plugin is moved on the system or Resolve is not installed into the default location, the correct filepaths must be set in the settings.  The plugin directory must be named "ResolveShortcuts".
 - It seems that Resolve's API to change databases is not working correctly.  So if a shortcut is trying to reach a project that is on another database to what Resolve is on currently, it will not work.  The solution is to navigate Resolve to the desired database and then the shortcuts will work.
@@ -52,14 +52,14 @@ Once added, restart Prism or reload plugins.
 
 ### **Creating Shortcut**
 
-To save a shortcut, open the Project Browser from the Prism tool inside Resolve.  Navigate to the desired Department/Task, and right click in the scenefiles area.  This opens the right-click menu with various Prism options, with the added "Save Shortcut to Resolve Project" item (the shortcut item will not be in Standalone or other DCC intergrations).  This will generate the .vbs file and save it in the Prism project structure.  The shortcut file will have a comment in its Description noting the Resolve project.
+To save a shortcut, open the Project Browser from the Prism tool inside Resolve.  Navigate to the desired Department/Task, and right click in the scenefiles area.  This opens the right-click menu with various Prism options, with the added "Save Shortcut to Resolve Project" item (the shortcut item will not be in Standalone or other DCC intergrations).  This will generate the .vbs file and save it in the Prism project structure.  The shortcut file will have a comment in its Description noting the Resolve project, and timeline if one existed at the time the shortcut was created.
 
 ![RCL Item](https://github.com/user-attachments/assets/69817b5d-b838-45f2-850d-7ecf1f5ce7c4)
 
 ### **Opening a Resolve Project**
-Shortcuts are located in the Scenefiles tab as any other DCC.  Double-clicking the shortcut will open Resolve and navigate to the project.
+Shortcuts are located in the Scenefiles tab as any other DCC.  Double-clicking the shortcut will open Resolve and navigate to the project, and timeline if applicable.
 
-![Shortcut Scenefile](https://github.com/user-attachments/assets/4ca36043-2fa6-4e04-8bc5-d3a4838267b6)
+![Scene Browser-Shortcut](https://github.com/user-attachments/assets/4fb60218-39ff-4fdb-865e-737bdc841e05)
 
 The shortcut file is generated from a .vbs file named "shortcutTemplate.vbs" in the Template directory.  The shortcut .vbs file is utilized to be able to be run by just double-clicking.  The script will read the environment variable to get the plugin directory location, and then send a command line command to run a python script (DvResolve_Project_Shortcuts.py) with the project path as an argument.  The python script will start Resolve, wait for the API to initialize, and then navigate to the project and open it.
 
@@ -75,10 +75,9 @@ Settings for ResolveShortcuts are located in Prism's:   Settings->User->ResolveS
 
 #### *Environment Variable*:
 
-The environment variable "DVR_shortcuts_path" must be set to point to the ResolveShortcuts plugin directory.  A button is provided in the settings to automatically set the variable (or remove if needed).  Using the button will set the variable, and then exit Prism.   The variable may also be manually set using Prism's environment or the standard systems settings.
+The environment variable "PRISM_DVR_SHORTCUTS_PATH" must be set to point to the ResolveShortcuts plugin directory.  A button is provided in the settings to automatically set the variable (or remove if needed).  Using the button will set the variable, and then exit Prism.   The variable may also be manually set using Prism's environment or the standard systems settings.
 
-
-![Enviro Set 2](https://github.com/user-attachments/assets/16430231-a1bf-489b-9d1a-69022b1824e6) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+![Enviro Var Tooltip](https://github.com/user-attachments/assets/e6ec0bb6-531f-4488-904a-867f4ca71a74) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 ![Enviro Remove](https://github.com/user-attachments/assets/bcffb2b4-e4c5-4f8a-9c97-67e287bb03eb)
 
 #### *File Paths*:
