@@ -14,10 +14,10 @@ Dim fso, file, config, lines, line, keyValue, pythonExe, scriptPath, projectPath
 ' Create FileSystemObject
 Set fso = CreateObject("Scripting.FileSystemObject")
 
-' Get the DVR_shortcuts_path environment variable
-dvrShortcutsPath = GetEnv("DVR_shortcuts_path")
+' Get the PRISM_DVR_SHORTCUTS_PATH environment variable
+dvrShortcutsPath = GetEnv("PRISM_DVR_SHORTCUTS_PATH")
 If dvrShortcutsPath = "" Then
-    WScript.Echo "ERROR: DVR_shortcuts_path environment variable is not set."
+    WScript.Echo "ERROR: PRISM_DVR_SHORTCUTS_PATH environment variable is not set."
     WScript.Quit
 End If
 
@@ -51,6 +51,8 @@ For Each line In lines
     End If
 Next
 
+
+
 ' Construct the full script path
 scriptPath = pluginPath & "\Scripts\DvResolve_Project_Shortcuts.py"
 
@@ -58,8 +60,12 @@ Set objShell = CreateObject("WScript.Shell")
 
 mode = "load"
 
+' Get the current script's path and name
+strScriptFullName = WScript.ScriptFullName
+strScriptName = fso.GetFileName(WScript.ScriptFullName)
+
 ' Run the command
-command = pythonExe & " """ & scriptPath & """ " & mode & " """ & projectPath & """"
+command = pythonExe & " """ & scriptPath & """ " & mode & " """ & projectPath & """ """ & strScriptName & """"
 objShell.Run command, 0, False
 
 Set objShell = Nothing
