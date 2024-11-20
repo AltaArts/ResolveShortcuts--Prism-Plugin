@@ -181,7 +181,7 @@ class ResolveShortcuts(object):
             print("Error:", e)
 
 
-    def openResolveProject(self, projectLoadPath, vbsFile, timeout=30):
+    def openResolveProject(self, projectLoadPath, timeout=60):
         #   Starts Resolve and imports the API    
         self.startResolve(timeout)
 
@@ -341,11 +341,12 @@ class ResolveShortcuts(object):
     def saveProjectShortcut(self, savePath):
         self.getProjectPath()
         #   Gets the template .vbs from plugin folder
-        templateFile = os.path.join(self.pluginPath,
-                                    "Scripts",
-                                    "Template",
-                                    "shortcutTemplate.vbs"
-                                    )
+        templateFile = os.path.normpath(os.path.join(self.pluginPath,
+                                                    "Scripts",
+                                                    "Template",
+                                                    "shortcutTemplate.vbs"
+                                                    )
+                                        )
         try:
             # Read the template file
             with open(templateFile, 'r') as file:
@@ -356,6 +357,11 @@ class ResolveShortcuts(object):
 
             # Replace the placeholder with the project path
             modifiedContent = modifiedContent.replace("PROJECT_PATH_REPLACE", self.projectPath)
+
+            # Create directory path if needed
+            shortcutDir = os.path.dirname(savePath)
+            if not os.path.exists(shortcutDir):
+                os.makedirs(shortcutDir, exist_ok=True)
 
             # Save the modified content to the new file
             with open(savePath, 'w') as file:
@@ -393,7 +399,7 @@ if __name__ == "__main__":
         vbsFile = args.vbsFile
 
         # Call the function to load the project in Resolve with a timeout of 30 seconds
-        resolveShortcuts.openResolveProject(projectPath, vbsFile, timeout=30)
+        resolveShortcuts.openResolveProject(projectPath, timeout=30)
 
     elif args.mode == "save":
         savePath = args.path
