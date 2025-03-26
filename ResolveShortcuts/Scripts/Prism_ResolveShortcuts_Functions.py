@@ -696,7 +696,11 @@ class Prism_ResolveShortcuts_Functions(object):
 
             #   Saves the details to the versioninfo.json
             origin.core.saveSceneInfo(savePath, detailData, preview=preview)
-            origin.refreshScenefiles()
+            
+            #   Refreshes the ProjectBrowser
+            # origin.refreshScenefiles()
+            self.core.pb.refreshUI()
+
             
         else:
             fullResult = f"Failed to save shortcut to {currProjName}:\n\n{saveResult}"
