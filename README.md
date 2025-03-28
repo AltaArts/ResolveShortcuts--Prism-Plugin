@@ -75,12 +75,21 @@ Settings for ResolveShortcuts are located in Prism's:   Settings->User->ResolveS
 
 ![Settings](https://github.com/user-attachments/assets/3c482dd4-66db-40b8-8af2-fb7dbfa122fc)
 
+#### *File Association*:
+
+Resolve Shortcuts uses a small Python file that contains the Resolve project "address".  This is just a .py file with a ".resolveShortcut" extension, and thus will not be recognized by the system by default.  Setting the file association will add a registry key for the current user to allow the shortcut file to be run by Python.
+
+To set the assocation, just click the "Click to Set" button.  And if needed, you may remove the associaton by clicking the "Click to Remove" button.
+
+![FileAssoc](https://github.com/user-attachments/assets/66dbbae5-7a42-439e-ae38-b5bd4754564c)
+
+
+
 #### *Environment Variable*:
 
 The environment variable "PRISM_DVR_SHORTCUTS_PATH" must be set to point to the ResolveShortcuts plugin directory.  A button is provided in the settings to automatically set the variable (or remove if needed).  Using the button will set the variable, and then exit Prism.   The variable may also be manually set using Prism's environment or the standard systems settings.
 
-![Enviro Var Tooltip](https://github.com/user-attachments/assets/e6ec0bb6-531f-4488-904a-867f4ca71a74) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-![Enviro Remove](https://github.com/user-attachments/assets/bcffb2b4-e4c5-4f8a-9c97-67e287bb03eb)
+![EnviroButton](https://github.com/user-attachments/assets/d07be8a1-c636-4af6-ba70-2b0b6fef53e2)
 
 #### *File Paths*:
 
