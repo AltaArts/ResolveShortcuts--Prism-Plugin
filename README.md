@@ -13,17 +13,17 @@ https://prism-pipeline.com/
 
 The ResolveShortcuts plugin adds the ability to save a shortcut to a project located in Davinci Resolve's internal database.  The shortcut file will be saved in the scenefiles alongside other versioned scenefiles.  This allows the abilty to directly open the project (and timeline if it exists) from Prism's Project Browser mimicking other DCC scenefiles without having to start Resolve, and navigate its Project Manager to find the project.
 
-The shortcut file is just a small Visual Basic script file (.vbs) that contains the "path" to the project (and timeline) that will start Resolve and open the project.
+The shortcut file is just a small Python script that contains the "path" to the project (and timeline) that will start Resolve and open the project.
 
 A shortcut can be saved into Prism by opening the Prism Project Browser from the Resolve Prism tool, and right clicking.  This opens the default Prism menu, with the added item "Save Shortcut to Resolve Project".
 
 ## **Notes**
 
-- Tested working up to Resolve 19.1.2 and Prism 2.0.15.
+- Tested working up to Resolve 19.1 and Prism 2.0.16.
 - Resolve Studio (paid version) must be used for this plugin to function. This is due to scripting being a Studio version feature. 
 - Two things need to be enabled for the plugin to function: the "Enabled" checkbox and the environment variable set.
 - This does not handle versioning as would be normal for scenefiles.  The shortcut just points to the project (and timeline) in Resolve.  A user can use a workflow where different timeline versions are saved as different shortcuts which will mimic "normal" versioning.
-- The shortcut files are small Visual Basic script files and thus the system's security preferences must allow .vbs scripts to run.
+- The shortcut files are small Python script files with the extension ".resolveShortcut" and thus the system's security preferences must allow .py scripts to run.
 - The plugin will attempt to set the required filepaths during first run of the plugin.  This assumes that Resolve is installed in the default location.  If the plugin is moved on the system or Resolve is not installed into the default location, the correct filepaths must be set in the settings.  The plugin directory must be named "ResolveShortcuts".
 - It seems that Resolve's API to change databases is not working correctly.  So if a shortcut is trying to reach a project that is on another database to what Resolve is on currently, it will not work.  The solution is to navigate Resolve to the desired database and then the shortcuts will work.
 - Shortcuts work for both local and Cloud databases.
@@ -54,7 +54,7 @@ Once added, restart Prism or reload plugins.
 
 ### **Creating Shortcut**
 
-To save a shortcut, open the Project Browser from the Prism tool inside Resolve.  Navigate to the desired Department/Task, and right click in the scenefiles area.  This opens the right-click menu with various Prism options, with the added "Save Shortcut to Resolve Project" item (the shortcut item will not be in Standalone or other DCC intergrations).  This will generate the .vbs file and save it in the Prism project structure.  The shortcut file will have a comment in its Description noting the Resolve project, and timeline if one existed at the time the shortcut was created.
+To save a shortcut, open the Project Browser from the Prism tool inside Resolve.  Navigate to the desired Department/Task, and right click in the scenefiles area.  This opens the right-click menu with various Prism options, with the added "Save Shortcut to Resolve Project" item (the shortcut item will not be in Standalone or other DCC intergrations).  This will generate the .resolveShortcut file and save it in the Prism project structure.  The shortcut file will have a comment in its Description noting the Resolve project, and timeline if one existed at the time the shortcut was created.
 
 ![RCL Item](https://github.com/user-attachments/assets/69817b5d-b838-45f2-850d-7ecf1f5ce7c4)
 
@@ -63,9 +63,9 @@ Shortcuts are located in the Scenefiles tab as any other DCC.  Double-clicking t
 
 ![Scene Browser-Shortcut](https://github.com/user-attachments/assets/4fb60218-39ff-4fdb-865e-737bdc841e05)
 
-The shortcut file is generated from a .vbs file named "shortcutTemplate.vbs" in the Template directory.  The shortcut .vbs file is utilized to be able to be run by just double-clicking.  The script will read the environment variable to get the plugin directory location, and then send a command line command to run a python script (DvResolve_Project_Shortcuts.py) with the project path as an argument.  The python script will start Resolve, wait for the API to initialize, and then navigate to the project and open it.
+The shortcut file is generated from a Python file named "shortcutTemplate.resolveShortcut" in the Template directory.  The shortcut file is utilized to be able to be run by just double-clicking.  The script will read the environment variable to get the plugin directory location, and then send a command line command to run a python script (DvResolve_Project_Shortcuts.py) with the project path as an argument.  The python script will start Resolve, wait for the API to initialize, and then navigate to the project and open it.
 
-![VBS](https://github.com/user-attachments/assets/8e53fe28-4eb9-4c06-acc3-a6e41bdedc03)
+![Template](https://github.com/user-attachments/assets/0bcff514-3df1-4db0-8bcf-11450a9e4f43)
 
 <br/>
 
@@ -73,7 +73,7 @@ The shortcut file is generated from a .vbs file named "shortcutTemplate.vbs" in 
 
 Settings for ResolveShortcuts are located in Prism's:   Settings->User->ResolveShortcuts.  The settings will be greyed-out and the shortcut functions will not be active until it is both enabled, and the environmant variable is set.
 
-![Settings](https://github.com/user-attachments/assets/65e10a15-f318-4b70-9907-5c1d63dd48bb)
+![Settings](https://github.com/user-attachments/assets/3c482dd4-66db-40b8-8af2-fb7dbfa122fc)
 
 #### *Environment Variable*:
 
