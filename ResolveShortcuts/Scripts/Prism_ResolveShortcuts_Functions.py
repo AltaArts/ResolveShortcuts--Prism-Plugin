@@ -81,25 +81,14 @@ class Prism_ResolveShortcuts_Functions(object):
 
         #   Get the Prism root directory
         self.prismRoot = os.environ.get("PRISM_ROOT", self.core.prismRoot)
+        if not self.prismRoot:
+            logger.warning("ERROR:  Unable to get the PrismRoot")
+            return None
 
-        #   Sets the python executable
-        if self.prismRoot:
-            #   Use RE to find Python 3 versions
-            python_pattern = re.compile(r"^Python\d{3}$")
-            #   Look at directories to find matching Python folder
-            for folder in os.listdir(self.prismRoot):
-                folder_path = os.path.join(self.prismRoot, folder)
-                if os.path.isdir(folder_path) and python_pattern.match(folder):
-                    python_exe = os.path.join(folder_path, "python.exe")
-                    #   Check if there is a python.exe
-                    if os.path.exists(python_exe):
-                        #   Set the python path
-                        self.pythonEXE = python_exe
-                        break
-        
-        #   Fallback to system Python version
+        #   Get Python.exe (Prism version or system fallback)
+        self.pythonEXE = self.getPrismPython()
         if not self.pythonEXE:
-            self.pythonEXE = sys.executable
+            return None
 
         #   Settings File
         self.pluginLocation = os.path.dirname(os.path.dirname(__file__))
@@ -196,7 +185,7 @@ class Prism_ResolveShortcuts_Functions(object):
         logger.warning("Creating settings file.")
         self.configData = {
                         "current_plugin_version": self.version,
-                        "python_exe_path": self.getPrismPython(),
+                        "python_exe_path": self.pythonEXE,
                         "plugin_path": self.pluginLocation,
                         "dvr_script_path": self.getResolveAPILoc(),
                         "resolve_exe": self.getResolveLoc(),
@@ -214,21 +203,27 @@ class Prism_ResolveShortcuts_Functions(object):
             logger.warning(f"Failed to save settings to {self.settingsFile}: {e}")
 
 
-    #   Finds the path to Python included with Prism
+    #   Finds the path to Python included with Prism or fallback to the system Python
     @err_catcher(name=__name__)
     def getPrismPython(self):
-        prismRoot = self.core.prismRoot
-        #   For different version of Prism which may use different Pythons
-        pythonPaths = ["Python311", "Python39"]
+        try:
+            #   Use RE to find Python 3 versions
+            python_pattern = re.compile(r"^Python\d{3}$")
+            #   Look at directories to find matching Python folder
+            for folder in os.listdir(self.prismRoot):
+                folder_path = os.path.join(self.prismRoot, folder)
+                if os.path.isdir(folder_path) and python_pattern.match(folder):
+                    pythonExe = os.path.join(folder_path, "python.exe")
+                    #   Check if there is a python.exe
+                    if os.path.exists(pythonExe):
+                        return pythonExe
+        
+            #   Fallback to system Python version
+            return sys.executable
 
-        for path in pythonPaths:
-            prismPythonPath = os.path.join(prismRoot, path, "python.exe")
-            prismPythonPath = os.path.normpath(prismPythonPath)
-
-            if os.path.exists(prismPythonPath):
-                return prismPythonPath
-
-        return None
+        except:
+            logger.warning("ERROR:  Unable to get the Python executable")
+            return None
 
 
     #   Since Resolve.exe does not seem to be found in winreg, this uses common install locations
