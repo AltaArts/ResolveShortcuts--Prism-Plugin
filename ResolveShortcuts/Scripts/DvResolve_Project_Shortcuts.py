@@ -39,8 +39,9 @@
 #                Alta Arts
 #
 #   A PlugIn that adds the ability to save a shortcut to a project that
-#   is located in the Resolve database.  This will create a .vbs file that contains
-#   the project path, and simple code to start Resolve and navigate to the project.
+#   is located in the Resolve database.  This will create a python script file 
+#   with the extension ".resolveShortcut" that contains the project path,
+#   and simple code to start Resolve and navigate to the project.
 #   Prism's ProjectBrowser launched from Resolve will contain a right-click menu
 #   item to save the shortcut.
 #
@@ -71,7 +72,7 @@ class ResolveShortcuts(object):
         dvr_script_path = None
         resolveEXE = None
 
-        # Read the config file - Have to use plain text for the .vbs file parse
+        # Read the config file - Have to use plain text for .vbs (older plugin style) for the shortcut file.
         try:
             with open(self.settingsFile, 'r') as file:
                 lines = file.readlines()
@@ -95,11 +96,11 @@ class ResolveShortcuts(object):
             return resolveEXE, dvr_script_path
 
         except FileNotFoundError:
-            print(f"ERROR: Configuration file '{self.settingsFile}' not found.")
+            print(f"[ResolveShortcuts] ERROR: Configuration file '{self.settingsFile}' not found.")
             return None
         
         except Exception as e:
-            print("ERROR: Config file formatting error.")
+            print("[ResolveShortcuts] ERROR: Config file formatting error.")
             return None
 
 
@@ -114,27 +115,28 @@ class ResolveShortcuts(object):
             #   Starts loop
             while self.resolve is None:
                 try:
+                    print("[ResolveShortcuts]  Loading Resolve...")
                     self.getResolve()
                     if self.resolve is not None:
-                        print("Resolve is running.")
+                        print("[ResolveShortcuts]  Resolve is running.")
                         #   Breakout once it is loaded
                         break
 
                 except Exception as e:
                     # Check if timeout exceeded
                     if time.time() - startTime > timeout:
-                        print("Timeout reached while waiting for Resolve to initialize.")
+                        print("[ResolveShortcuts]  Timeout reached while waiting for Resolve to initialize.")
                         return
                     
-                    print(f"Error: {e}")
+                    print(f"[ResolveShortcuts] ERROR: {e}")
                     time.sleep(1)
 
             if self.resolve is None:
-                print("Could not initialize Resolve instance.")
+                print("[ResolveShortcuts] ERROR: Could not initialize Resolve instance.")
                 return
             
         except Exception as e:
-            print("Error:", e)
+            print("[ResolveShortcuts] ERROR:", e)
 
 
     #   Imports DVR API Script
@@ -143,7 +145,7 @@ class ResolveShortcuts(object):
             import DaVinciResolveScript as dvr
 
         except ImportError:
-            print("Failed to import DaVinciResolveScript")
+            print("[ResolveShortcuts] ERROR: Failed to import DaVinciResolveScript")
             sys.exit(1)
 
         #   Instantiate the API
@@ -158,27 +160,28 @@ class ResolveShortcuts(object):
             #   Starts loop
             while currProject is None:
                 try:
+                    print("[ResolveShortcuts]: Loading Project...")
                     currProject = self.pm.GetCurrentProject()
                     if currProject is not None:
-                        print("Current Project loaded.")
+                        print("[ResolveShortcuts]: Current Project loaded.")
                         #   Return once it is loaded
                         return currProject
                     
                 except Exception as e:
                     # Check if timeout exceeded
                     if time.time() - startTime > timeout:
-                        print("Timeout reached while waiting for Project to initialize.")
+                        print("[ResolveShortcuts]:  Timeout reached while waiting for Project to initialize.")
                         return
                     
-                    print(f"Error: {e}")
+                    print(f"[ResolveShortcuts] ERROR: {e}")
                     time.sleep(1)
 
             if currProject is None:
-                print("Could not initialize Resolve Project.")
+                print("[ResolveShortcuts] ERROR: Could not initialize Resolve Project.")
                 return
             
         except Exception as e:
-            print("Error:", e)
+            print("[ResolveShortcuts] ERROR:", e)
 
 
     def openResolveProject(self, projectLoadPath, timeout=60):
@@ -189,7 +192,7 @@ class ResolveShortcuts(object):
             return
         #   Checks if arg path is misformatted
         if len(projectLoadPath) < 2:
-            print("Invalid project path format.")
+            print("[ResolveShortcuts] ERROR: Invalid project path format.")
             return
         
         # Get the project manager
@@ -199,7 +202,7 @@ class ResolveShortcuts(object):
         # Split arg path into database, path, and optionally the timeline
         match = re.match(r"(.*?)(<.*>)?$", projectLoadPath)
         if not match:
-            print("Invalid project path format.")
+            print("[ResolveShortcuts] ERROR: Invalid project path format.")
             return
 
         projectPath = match.group(1).strip("\\")
@@ -208,7 +211,7 @@ class ResolveShortcuts(object):
         # Extract the database name
         path_components = projectPath.split("\\")
         if len(path_components) < 2:
-            print("Invalid project path format.")
+            print("[ResolveShortcuts] ERROR: Invalid project path format.")
             return
         
         projectDB = path_components[0]
@@ -217,7 +220,7 @@ class ResolveShortcuts(object):
         #   Since the API call to change DB's does not seem to work,
         #   can only check if the database match
         if currDbName != projectDB:
-            print("Incorrect Resolve Database selected")
+            print("[ResolveShortcuts] ERROR: Incorrect Resolve Database selected")
             return
 
         #   Saves the currently open project if it is not the
@@ -231,6 +234,8 @@ class ResolveShortcuts(object):
         
         #   Navigates to the root folder to start since there is no way
         #   to go directly to a dir path
+
+        print("[ResolveShortcuts]  Loading Project...")
         self.pm.GotoRootFolder()
         
         folders = projectPath.split("\\")
@@ -243,17 +248,18 @@ class ResolveShortcuts(object):
             for folderName in folderPath.split("\\"):
                 if folderName.strip():
                     if not self.pm.OpenFolder(folderName):
-                        print(f"Failed to open folder: {folderName}")
+                        print(f"[ResolveShortcuts] ERROR: Failed to open folder: {folderName}")
                         return
 
         # Load the project
         if not self.pm.LoadProject(projectName):
-            print(f"Failed to load project: {projectName}")
+            print(f"[ResolveShortcuts] ERROR: Failed to load project: {projectName}")
         else:
-            print(f"Project {projectName} loaded successfully.")
+            print(f"[ResolveShortcuts]  Project {projectName} loaded successfully.")
 
         # Load the timeline if specified
         if timelineName:
+            print("[ResolveShortcuts]  Loading Timeline")
             #   Uses a loop to instantiate project while waiting to loading
             project = self.getCurrProjectLoop(timeout=30)
             timelineCount = project.GetTimelineCount()
@@ -262,10 +268,10 @@ class ResolveShortcuts(object):
                 timeline = project.GetTimelineByIndex(index)
                 if timeline.GetName() == timelineName:
                     project.SetCurrentTimeline(timeline)
-                    print(f"Timeline {timelineName} loaded successfully.")
+                    print(f"[ResolveShortcuts]  Timeline {timelineName} loaded successfully.")
                     break
             else:
-                print(f"Timeline {timelineName} not found.")
+                print(f"[ResolveShortcuts] ERROR: Timeline {timelineName} not found.")
 
 
     def getProjectPath(self):
@@ -308,12 +314,12 @@ class ResolveShortcuts(object):
             projectPath = dbName + "\\" + projectPath
             self.projectPath = projectPath.replace("\\\\", "\\")
 
-            print(f"projectPath:  {self.projectPath}")
+            print(f"[ResolveShortcuts]  ProjectPath:  {self.projectPath}")
 
             self.openResolveProject(self.projectPath)
 
         except Exception as e:
-            print("Error:", e)
+            print("[ResolveShortcuts] ERROR:", e)
 
 
     # def getThumbnail(self, thumbPath):
@@ -340,11 +346,11 @@ class ResolveShortcuts(object):
 
     def saveProjectShortcut(self, savePath):
         self.getProjectPath()
-        #   Gets the template .vbs from plugin folder
+        #   Gets the template .resolveShortcut from plugin folder
         templateFile = os.path.normpath(os.path.join(self.pluginPath,
                                                     "Scripts",
                                                     "Template",
-                                                    "shortcutTemplate.vbs"
+                                                    "shortcutTemplate.resolveShortcut"
                                                     )
                                         )
         try:
@@ -378,7 +384,7 @@ class ResolveShortcuts(object):
 
 
 
-#   If called from command line such as being called from the shortcut .vbs
+#   If called from command line such as being called from the shortcut script file
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Resolve Project Shortcuts")
 
@@ -388,7 +394,7 @@ if __name__ == "__main__":
                         )
     
     parser.add_argument("path", help="Path to project or file")
-    parser.add_argument("vbsFile", help="Name of the .vbs file that called this script")
+    parser.add_argument("shortcutFile", help="Name of the .resolveShortcut file that called this script")
     
     args = parser.parse_args()
 
@@ -396,7 +402,7 @@ if __name__ == "__main__":
 
     if args.mode == "load":
         projectPath = args.path
-        vbsFile = args.vbsFile
+        shortcutFile = args.shortcutFile
 
         # Call the function to load the project in Resolve with a timeout of 30 seconds
         resolveShortcuts.openResolveProject(projectPath, timeout=30)

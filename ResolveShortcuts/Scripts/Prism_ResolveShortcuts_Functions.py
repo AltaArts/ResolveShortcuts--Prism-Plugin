@@ -39,8 +39,9 @@
 #                Alta Arts
 #
 #   A PlugIn that adds the ability to save a shortcut to a project that
-#   is located in the Resolve database.  This will create a .vbs file that contains
-#   the project path, and simple code to start Resolve and navigate to the project.
+#   is located in the Resolve database.  This will create a python script file 
+#   with the extension ".resolveShortcut" that contains the project path,
+#   and simple code to start Resolve and navigate to the project.
 #   Prism's ProjectBrowser launched from Resolve will contain a right-click menu
 #   item to save the shortcut.
 #
@@ -48,11 +49,13 @@
 
 
 import os
-import shutil
+import sys
 import glob
 import logging
 import subprocess
 import tempfile
+import winreg
+import re
 
 from qtpy.QtCore import *
 from qtpy.QtGui import *
@@ -63,6 +66,10 @@ from PrismUtils.Decorators import err_catcher_plugin as err_catcher
 logger = logging.getLogger(__name__)
 
 
+#   Globals
+EXTENSION = ".resolveShortcut"
+SHORTCUTS_ENVIRO_VAR = "PRISM_DVR_SHORTCUTS_PATH"
+
 
 class Prism_ResolveShortcuts_Functions(object):
     def __init__(self, core, plugin):
@@ -70,6 +77,29 @@ class Prism_ResolveShortcuts_Functions(object):
         self.plugin = plugin
         self.shortcutsEnabled = False
         self.useIcon = False
+        self.pythonEXE = None
+
+        #   Get the Prism root directory
+        self.prismRoot = os.environ.get("PRISM_ROOT", self.core.prismRoot)
+
+        #   Sets the python executable
+        if self.prismRoot:
+            #   Use RE to find Python 3 versions
+            python_pattern = re.compile(r"^Python\d{3}$")
+            #   Look at directories to find matching Python folder
+            for folder in os.listdir(self.prismRoot):
+                folder_path = os.path.join(self.prismRoot, folder)
+                if os.path.isdir(folder_path) and python_pattern.match(folder):
+                    python_exe = os.path.join(folder_path, "python.exe")
+                    #   Check if there is a python.exe
+                    if os.path.exists(python_exe):
+                        #   Set the python path
+                        self.pythonEXE = python_exe
+                        break
+        
+        #   Fallback to system Python version
+        if not self.pythonEXE:
+            self.pythonEXE = sys.executable
 
         #   Settings File
         self.pluginLocation = os.path.dirname(os.path.dirname(__file__))
@@ -105,12 +135,12 @@ class Prism_ResolveShortcuts_Functions(object):
         return True
 
 
-    #   Will use the custom icon for .vbs files if enabled
+    #   Will use the custom icon for .resolveShortcut files if enabled
     @err_catcher(name=__name__)
     def setIcon(self, extension):
         if self.shortcutsEnabled and self.useIcon:
             try:
-                if extension == ".vbs":
+                if extension == EXTENSION:
                     icon = os.path.join(self.pluginLocation, "UserInterfaces", "ResolveShortcuts.ico")
                     logger.debug("Loaded ResolveShortcut Icon")
                     return icon
@@ -122,7 +152,7 @@ class Prism_ResolveShortcuts_Functions(object):
         return None
 
 
-    #   Load settings from plain text file due to using .vbs for the shortcut file.
+    #   Load settings from plain text file due to using .vbs (older plugin style) for the shortcut file.
     @err_catcher(name=__name__)
     def loadSettings(self):
         #   Parses plain text into dict
@@ -178,10 +208,10 @@ class Prism_ResolveShortcuts_Functions(object):
                 for key, value in self.configData.items():
                     value = value.replace("\\", "/")
                     file.write(f"{key}={value}\n")
-            logger.info(f"Settings saved to {self.settingsFile}")
+            logger.debug(f"Settings saved to {self.settingsFile}")
 
         except Exception as e:
-            logger.error(f"Failed to save settings to {self.settingsFile}: {e}")
+            logger.warning(f"Failed to save settings to {self.settingsFile}: {e}")
 
 
     #   Finds the path to Python included with Prism
@@ -235,7 +265,7 @@ class Prism_ResolveShortcuts_Functions(object):
         return resolveAPIpath
 
 
-    #   Save settings to plain text file due to using .vbs for the shortcut file.
+    #   Save settings to plain text file due to using .vbs (older plugin style) for the shortcut file.
     @err_catcher(name=__name__)
     def saveSettings(self, origin=None):
         pData = {"current_plugin_version": self.version,
@@ -251,10 +281,10 @@ class Prism_ResolveShortcuts_Functions(object):
                 for key, value in pData.items():
                     value = value.replace("\\", "/")
                     file.write(f"{key}={value}\n")
-            logger.info(f"Settings saved to {self.settingsFile}")
+            logger.debug(f"Settings saved to {self.settingsFile}")
 
         except Exception as e:
-            logger.error(f"Failed to save settings to {self.settingsFile}: {e}")
+            logger.warning(f"ERROR:  Failed to save settings to {self.settingsFile}: {e}")
 
 
     # #   Called with Callback
@@ -268,25 +298,38 @@ class Prism_ResolveShortcuts_Functions(object):
 
         lo_resolveShortcuts.addItem(QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Fixed))
 
-        # ENABLE SHORTCUT FUNCTIONS CHECKBOX
+        #   Create Topbar layout
         lo_topBar = QHBoxLayout()
         
-        self.chb_enableShortcutFunctions = QCheckBox("Enable Resolve Shortcut Functions")
+        # ENABLE SHORTCUT FUNCTIONS CHECKBOX
+        self.chb_enableShortcutFunctions = QCheckBox("Resolve Shortcut Functions")
         lo_topBar.addWidget(self.chb_enableShortcutFunctions)
 
         lo_topBar.addItem(QSpacerItem(20, 10, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
-        l_enviroVarSet = QLabel("Enviro Variable is:")
+        #   FILE ASSOCIATION BUTTONS
+        l_fileAssociation = QLabel("File Association:")
+        lo_topBar.addWidget(l_fileAssociation)
+
+        self.b_setFileAssociation = QPushButton("Click to Set")
+        self.b_setFileAssociation.clicked.connect(self.setShortcutFileAssociation)
+        lo_topBar.addWidget(self.b_setFileAssociation)
+
+        self.b_delFileAssociation = QPushButton("Click to Remove")
+        self.b_delFileAssociation.clicked.connect(self.removeShortcutFileAssociation)
+        lo_topBar.addWidget(self.b_delFileAssociation)
+
+        lo_topBar.addItem(QSpacerItem(20, 10, QSizePolicy.Expanding, QSizePolicy.Minimum))
+
+        #   ENVIRO VARIABLE
+        l_enviroVarSet = QLabel("Enviro Variable:")
         lo_topBar.addWidget(l_enviroVarSet)
 
-        self.l_enviroStatus = QLabel("NOT SET    ")
-        lo_topBar.addWidget(self.l_enviroStatus)
-
-        self.but_setEnviroVar = QPushButton("Set    ")
+        self.but_setEnviroVar = QPushButton("Click to Set")
         self.but_setEnviroVar.clicked.connect(self.setEnviroVar)
         lo_topBar.addWidget(self.but_setEnviroVar)
 
-        self.but_removeEnviroVar = QPushButton("Remove")
+        self.but_removeEnviroVar = QPushButton("Click to Remove")
         self.but_removeEnviroVar.clicked.connect(self.removeEnviroVar)
         lo_topBar.addWidget(self.but_removeEnviroVar)
 
@@ -317,7 +360,6 @@ class Prism_ResolveShortcuts_Functions(object):
         l_resolveExample = QLabel("             (example:  C:/Program Files/Blackmagic Design/DaVinci Resolve/Resolve.exe)")
         l_resolveExample.setStyleSheet("font-size: 8pt;")
         lo_resolveConfig.addWidget(l_resolveExample)
-
 
         lo_resolveConfig.addItem(QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Fixed))
 
@@ -425,19 +467,37 @@ class Prism_ResolveShortcuts_Functions(object):
         tip = "Globally enable the Resolve Shortcuts functionality."
         self.chb_enableShortcutFunctions.setToolTip(tip)
 
-        tip = ("Status of the system environment variable (PRISM_DVR_SHORTCUTS_PATH).\n"
+        tip = (f"Status of the system file association of '{EXTENSION}'.\n"
+               f"The file association must be set in order for the double-clicking\n"
+               "of the shortcut file to launch properly.  This will associate\n"
+               f"'{EXTENSION}' files with Python.\n\n"
+               "Green:  file association is valid\n"
+               "Red:      file is not associated")
+        l_fileAssociation.setToolTip(tip)
+
+        tip = (f"'{EXTENSION}' does not appear to be associated with Python.\n\n"
+               f"Click to associate the '{EXTENSION}' file type.")
+        self.b_setFileAssociation.setToolTip(tip)
+
+        tip = (f"'{EXTENSION}' appears to be properly associated with\n"
+               "Python.\n\n"
+               f"Click to remove '{EXTENSION}' file association.")
+        self.b_delFileAssociation.setToolTip(tip)
+
+        tip = (f"Status of the system environment variable ({SHORTCUTS_ENVIRO_VAR}).\n"
                "The enviro variable must be set to use the shortcut functions.\n\n"
                "To manually set via Prism enviroment or system:\n\n"
-               "KEY:        'PRISM_DVR_SHORTCUTS_PATH'\n"
+               f"KEY:        '{SHORTCUTS_ENVIRO_VAR}'\n"
                "VALUE:    '[path/to/ResolveShortcuts] plugin dir'")
         l_enviroVarSet.setToolTip(tip)
-        self.l_enviroStatus.setToolTip(tip)
 
-        tip = ("Add the required system environment variable.\n"
+        tip = (f"'{SHORTCUTS_ENVIRO_VAR}' appears not to be set\n\n"
+               "Click to set the required system environment variable.\n"
                "Prism will automatically exit and must be manually restarted.")
         self.but_setEnviroVar.setToolTip(tip)
 
-        tip = ("Remove the system environment variable.\n"
+        tip = (f"'{SHORTCUTS_ENVIRO_VAR}' appears to be properly set\n\n"
+               "Click to remove the system environment variable.\n"
                "Prism will automatically exit and must be manually restarted.")
         self.but_removeEnviroVar.setToolTip(tip)
 
@@ -467,7 +527,7 @@ class Prism_ResolveShortcuts_Functions(object):
         l_pluginLoc.setToolTip(tip)
         self.e_pluginLoc.setToolTip(tip)
 
-        tip = ("Associate custom icon to shortcut scenefiles (.vbs)\n"
+        tip = ("Associate custom icon to shortcut scenefiles (.resolveShortcut)\n"
                "Prism must be restarted for change to be visible.")
         self.chb_useIcon.setToolTip(tip)
 
@@ -527,7 +587,7 @@ class Prism_ResolveShortcuts_Functions(object):
                                                         options=options
                                                         )
         else:
-            print("Invalid type specified. Use 'file' or 'folder'.")
+            logger.warning("ERROR:  Invalid type specified. Use 'file' or 'folder'.")
             return
 
         if filePath:
@@ -551,30 +611,122 @@ class Prism_ResolveShortcuts_Functions(object):
     #   Configures Settings UI elements
     @err_catcher(name=__name__)
     def refreshUI(self, *args):
-        set = self.checkEnviroVar()
+        isEnviroVar = self.checkEnviroVar()
 
-        if set:
-            self.l_enviroStatus.setText("SET")
+        if isEnviroVar:
             self.but_setEnviroVar.hide()
             self.but_removeEnviroVar.show()
+            self.but_removeEnviroVar.setStyleSheet("background-color: green; color: white;")
+            self.but_setEnviroVar.setStyleSheet("background-color: green; color: white;")
         else:
-            self.l_enviroStatus.setText("NOT SET")
             self.but_setEnviroVar.show()
             self.but_removeEnviroVar.hide()
+            self.but_setEnviroVar.setStyleSheet("background-color: red; color: white;")
+            self.but_removeEnviroVar.setStyleSheet("background-color: red; color: white;")
+
+        isFileAssociated = self.checkFileAssoc()
+
+        if isFileAssociated:
+            self.b_setFileAssociation.hide()
+            self.b_delFileAssociation.show()
+            self.b_setFileAssociation.setStyleSheet("background-color: green; color: white;")
+            self.b_delFileAssociation.setStyleSheet("background-color: green; color: white;")
+        else:
+            self.b_setFileAssociation.show()
+            self.b_delFileAssociation.hide()
+            self.b_setFileAssociation.setStyleSheet("background-color: red; color: white;")
+            self.b_delFileAssociation.setStyleSheet("background-color: red; color: white;")
 
         enabled = self.chb_enableShortcutFunctions.isChecked()
-        
-        if set and enabled:
-            self.gb_resolveConfig.setEnabled(True)
-        else:
-            self.gb_resolveConfig.setEnabled(False)
+        self.gb_resolveConfig.setEnabled(isEnviroVar and enabled)
 
+
+    #   Checks for file association
+    @err_catcher(name=__name__)
+    def checkFileAssoc(self):
+        try:
+            #   Check what file type is associated with .resolveShortcut
+            with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, ".resolveShortcut", 0, winreg.KEY_READ) as key:
+                fileType, _ = winreg.QueryValueEx(key, None)
+            
+            #   If there's no file type associated, return False
+            if not fileType:
+                return False
+            
+            #   Check what command is associated with opening that file type
+            command_key = f"{fileType}\\shell\\open\\command"
+            with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, command_key, 0, winreg.KEY_READ) as key:
+                command, _ = winreg.QueryValueEx(key, None)
+            
+            return "python.exe" in command.lower()
         
+        except FileNotFoundError:
+            return False
+        except Exception as e:
+            logger.warning(f"ERROR: checking file association: {e}")
+            return False
+        
+
+    @err_catcher(name=__name__)
+    def setShortcutFileAssociation(self):
+        try:
+            # Associate the extension with a file type (User level)
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, f"Software\\Classes\\{EXTENSION}") as key:
+                winreg.SetValue(key, "", winreg.REG_SZ, "PythonFile")
+
+            # Set the command to open with Python (User level)
+            command = f'"{self.pythonEXE}" "%1"'
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, f"Software\\Classes\\PythonFile\\shell\\open\\command") as key:
+                winreg.SetValue(key, "", winreg.REG_SZ, command)
+
+            logger.debug(f"Successfully associated {EXTENSION} files with Python.")
+
+            # Tell Windows to refresh file associations (User level)
+            subprocess.run(["assoc", f"{EXTENSION}=PythonFile"], shell=True)
+            subprocess.run(["ftype", f"PythonFile={command}"], shell=True)
+
+        except Exception as e:
+            logger.warning(f"ERROR:  Unable to set file association: {e}")
+
+        self.refreshUI()
+
+
+    @err_catcher(name=__name__)
+    def removeShortcutFileAssociation(self):
+        try:
+            # Delete the file extension association (User level)
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, f"Software\\Classes\\{EXTENSION}")
+            
+            # Delete the command to open with Python (User level)
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, f"Software\\Classes\\PythonFile\\shell\\open\\command")
+            
+            # Delete the PythonFile association if no other references exist
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Software\\Classes", 0, winreg.KEY_READ) as classes_key:
+                try:
+                    winreg.OpenKey(classes_key, "PythonFile")
+                    winreg.DeleteKey(winreg.HKEY_CURRENT_USER, "Software\\Classes\\PythonFile")
+                except FileNotFoundError:
+                    pass  # No need to delete if it doesn't exist
+
+            logger.debug(f"Successfully removed {EXTENSION} file association.")
+
+            # Refresh Windows file associations
+            subprocess.run(["assoc", f"{EXTENSION}="], shell=True)
+            subprocess.run(["ftype", "PythonFile="], shell=True)
+
+        except FileNotFoundError:
+            logger.warning(f"File association for {EXTENSION} not found.")
+        except Exception as e:
+            logger.warning(f"ERROR: Unable to remove file association: {e}")
+
+        self.refreshUI()
+        
+
     #   Checks if required enviro variable exists
     @err_catcher(name=__name__)
     def checkEnviroVar(self):
-        return 'PRISM_DVR_SHORTCUTS_PATH' in os.environ
-
+        return bool(os.environ.get(SHORTCUTS_ENVIRO_VAR))
+    
 
     #   Set required enviro var and exits Prism
     @err_catcher(name=__name__)
@@ -590,15 +742,15 @@ class Prism_ResolveShortcuts_Functions(object):
             if result == "Yes":
                 try:
                     self.saveSettings()
-                    logger.debug("Setting 'PRISM_DVR_SHORTCUTS_PATH' environment variable")
+                    logger.debug(f"Setting '{SHORTCUTS_ENVIRO_VAR}' environment variable")
                     logger.debug("Prism will exit")
-                    subprocess.run(['setx', 'PRISM_DVR_SHORTCUTS_PATH', self.pluginLocation], check=True)
+                    subprocess.run(['setx', SHORTCUTS_ENVIRO_VAR, self.pluginLocation], check=True)
                     self.core.PrismTray.exitTray()
 
                 except Exception as e:
                     self.core.popup("Failed to set environment variable.")
-                    logger.error("Failed to set environment variable.")
-                    logger.error(e)
+                    logger.warning("Failed to set environment variable.")
+                    logger.warning(e)
 
         
     #   Removes enviro var
@@ -615,15 +767,15 @@ class Prism_ResolveShortcuts_Functions(object):
             if result == "Yes":
                 try:
                     self.saveSettings()
-                    logger.debug("Removing 'PRISM_DVR_SHORTCUTS_PATH' environment variable")
+                    logger.debug(f"Removing '{SHORTCUTS_ENVIRO_VAR}' environment variable")
                     logger.debug("Prism will exit")
-                    subprocess.run(['setx', 'PRISM_DVR_SHORTCUTS_PATH', ""], check=True)
+                    subprocess.run(['setx', SHORTCUTS_ENVIRO_VAR, ""], check=True)
                     self.core.PrismTray.exitTray()
 
                 except Exception as e:
                     self.core.popup("Failed to remove environment variable.")
-                    logger.error("Failed to remove environment variable.")
-                    logger.error(e)
+                    logger.warning("Failed to remove environment variable.")
+                    logger.warning(e)
 
 
     #   Adds right-click menu item
@@ -638,7 +790,7 @@ class Prism_ResolveShortcuts_Functions(object):
             rcmenu.addAction(shortcutAct)
 
 
-    #   Builds and saves shortcut (.vbs file)
+    #   Builds and saves shortcut (.resolveShortcut file)
     @err_catcher(name=__name__)
     def saveShortcut(self, origin):
         #   Get details and save path data
@@ -649,7 +801,7 @@ class Prism_ResolveShortcuts_Functions(object):
                                                  department=curDep,
                                                  task=curTask,
                                                  comment=None,
-                                                 extension=".vbs",
+                                                 extension=".resolveShortcut",
                                                  # location=location
                                                  )
         preview = None
