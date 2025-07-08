@@ -19,12 +19,13 @@ A shortcut can be saved into Prism by opening the Prism Project Browser from the
 
 ## **Notes**
 
-- Tested working up to Resolve 19.1 and Prism 2.0.16.
+- Tested working up to Resolve 20 and Prism 2.0.17.
 - Resolve Studio (paid version) must be used for this plugin to function. This is due to scripting being a Studio version feature. 
 - Two things need to be enabled for the plugin to function: the "Enabled" checkbox and the environment variable set.
 - This does not handle versioning as would be normal for scenefiles.  The shortcut just points to the project (and timeline) in Resolve.  A user can use a workflow where different timeline versions are saved as different shortcuts which will mimic "normal" versioning.
 - The shortcut files are small Python script files with the extension ".resolveShortcut" and thus the system's security preferences must allow .py scripts to run.
 - The plugin will attempt to set the required filepaths during first run of the plugin.  This assumes that Resolve is installed in the default location.  If the plugin is moved on the system or Resolve is not installed into the default location, the correct filepaths must be set in the settings.  The plugin directory must be named "ResolveShortcuts".
+- Note: if a project was created with a previous version of Resolve, opening the Project Shortcut with a newer Resolve version will silently upgrade the project (as opposed to showing a UI popup asking to upgrade)
 - It seems that Resolve's API to change databases is not working correctly.  So if a shortcut is trying to reach a project that is on another database to what Resolve is on currently, it will not work.  The solution is to navigate Resolve to the desired database and then the shortcuts will work.
 - Shortcuts work for both local and Cloud databases.
 - During shortcut generation, a Prism thumbnail will be attempted to be saved using Resolve's stills capture functions.  It should work in most situations. 
