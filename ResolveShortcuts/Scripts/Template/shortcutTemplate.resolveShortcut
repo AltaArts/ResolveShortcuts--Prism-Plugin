@@ -9,7 +9,7 @@ import subprocess
 
 #   SHORTCUT PROJECT PATH INFO
 #   vvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-PROJECT_PATH = "PROJECT_PATH_REPLACE"
+PROJECT_PATH = r"PROJECT_PATH_REPLACE"
 #   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # Get the PRISM_DVR_SHORTCUTS_PATH environment variable
