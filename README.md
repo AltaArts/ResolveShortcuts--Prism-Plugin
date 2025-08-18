@@ -19,7 +19,7 @@ A shortcut can be saved into Prism by opening the Prism Project Browser from the
 
 ## **Notes**
 
-- Tested working up to Resolve 20 and Prism 2.0.17.
+- Tested working up to Resolve 20 and Prism 2.0.18.
 - Resolve Studio (paid version) must be used for this plugin to function. This is due to scripting being a Studio version feature. 
 - Two things need to be enabled for the plugin to function: the "Enabled" checkbox and the environment variable set.
 - This does not handle versioning as would be normal for scenefiles.  The shortcut just points to the project (and timeline) in Resolve.  A user can use a workflow where different timeline versions are saved as different shortcuts which will mimic "normal" versioning.
