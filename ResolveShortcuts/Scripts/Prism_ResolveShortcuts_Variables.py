@@ -52,10 +52,10 @@ import os
 
 class Prism_ResolveShortcuts_Variables(object):
     def __init__(self, core, plugin):
-        self.version = "v2.0.10-2.1"
+        self.version = "v2.0.10-2.2"
         self.pluginName = "ResolveShortcuts"
         self.pluginType = "Custom"
-        self.sceneFormats = [".vbs"]
+        self.sceneFormats = [".resolveShortcut"]
         self.pluginDirectory = os.path.abspath(
             os.path.dirname(os.path.dirname(__file__))
             )

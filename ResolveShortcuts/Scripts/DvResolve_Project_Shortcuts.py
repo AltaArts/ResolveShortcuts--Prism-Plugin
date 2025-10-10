@@ -115,10 +115,10 @@ class ResolveShortcuts(object):
             #   Starts loop
             while self.resolve is None:
                 try:
-                    print("[ResolveShortcuts]  Loading Resolve...")
+                    print("[ResolveShortcuts] Loading Resolve...")
                     self.getResolve()
                     if self.resolve is not None:
-                        print("[ResolveShortcuts]  Resolve is running.")
+                        print("[ResolveShortcuts] Resolve is running.")
                         #   Breakout once it is loaded
                         break
 
@@ -127,7 +127,7 @@ class ResolveShortcuts(object):
                 except Exception as e:
                     #   Check if Timeout Exceeded
                     if time.time() - startTime > timeout:
-                        print("[ResolveShortcuts]  Timeout reached while waiting for Resolve to initialize.")
+                        print("[ResolveShortcuts] Timeout reached while waiting for Resolve to initialize.")
                         return
                     
                     print(f"[ResolveShortcuts] ERROR: {e}")
@@ -162,10 +162,10 @@ class ResolveShortcuts(object):
             #   Starts loop
             while currProject is None:
                 try:
-                    print("[ResolveShortcuts]: Loading Project Loop...")
+                    print("[ResolveShortcuts] Loading Project Loop...")
                     currProject = self.pm.GetCurrentProject()
                     if currProject is not None:
-                        print("[ResolveShortcuts]: Current Project loaded.")
+                        print("[ResolveShortcuts] Current Project loaded.")
                         #   Return once it is loaded
                         return currProject
                     
@@ -174,7 +174,7 @@ class ResolveShortcuts(object):
                 except Exception as e:
                     #   Check if timeout exceeded
                     if time.time() - startTime > timeout:
-                        print("[ResolveShortcuts]:  Timeout reached while waiting for Project to initialize.")
+                        print("[ResolveShortcuts] Timeout reached while waiting for Project to initialize.")
                         return
                     
                     print(f"[ResolveShortcuts] ERROR: {e}")
@@ -239,7 +239,7 @@ class ResolveShortcuts(object):
         except AttributeError:
             pass
 
-        print("[ResolveShortcuts]  Loading Project...")
+        print("[ResolveShortcuts] Loading Project...")
         self.pm.GotoRootFolder()
 
         if folderPath:
@@ -254,17 +254,17 @@ class ResolveShortcuts(object):
             print(f"[ResolveShortcuts] ERROR: Failed to load project: {projectName}")
             return
         else:
-            print(f"[ResolveShortcuts]  Project {projectName} loaded successfully.")
+            print(f"[ResolveShortcuts] Project {projectName} loaded successfully.")
 
         if timelineName:
-            print("[ResolveShortcuts]  Loading Timeline")
+            print("[ResolveShortcuts] Loading Timeline")
             project = self.getCurrProjectLoop(timeout=30)
             timelineCount = project.GetTimelineCount()
             for index in range(1, timelineCount + 1):
                 timeline = project.GetTimelineByIndex(index)
                 if timeline.GetName() == timelineName:
                     project.SetCurrentTimeline(timeline)
-                    print(f"[ResolveShortcuts]  Timeline {timelineName} loaded successfully.")
+                    print(f"[ResolveShortcuts] Timeline {timelineName} loaded successfully.")
                     break
             else:
                 print(f"[ResolveShortcuts] ERROR: Timeline {timelineName} not found.")
@@ -310,7 +310,7 @@ class ResolveShortcuts(object):
             projectPath = dbName + "\\" + projectPath
             self.projectPath = projectPath.replace("\\\\", "\\")
 
-            print(f"[ResolveShortcuts]  ProjectPath:  {self.projectPath}")
+            print(f"[ResolveShortcuts] ProjectPath:  {self.projectPath}")
 
             self.openResolveProject(self.projectPath)
 

@@ -15,7 +15,7 @@ PROJECT_PATH = r"PROJECT_PATH_REPLACE"
 # Get the PRISM_DVR_SHORTCUTS_PATH environment variable
 path_dvrShortcuts = os.getenv("PRISM_DVR_SHORTCUTS_PATH")
 if not path_dvrShortcuts:
-    print("ERROR: PRISM_DVR_SHORTCUTS_PATH environment variable is not set.")
+    print("[ERROR] PRISM_DVR_SHORTCUTS_PATH environment variable is not set.")
     exit()
 
 # Build the path to the configuration file
@@ -23,7 +23,7 @@ path_configFile = os.path.join(path_dvrShortcuts, "ResolveShortcuts_Config.txt")
 
 # Check if the config file exists
 if not os.path.exists(path_configFile):
-    print(f"ERROR: Configuration file not found at {path_configFile}")
+    print(f"[ERROR] Configuration file not found at {path_configFile}")
     exit()
 
 # Read the configuration file
@@ -39,6 +39,16 @@ with open(path_configFile, "r") as file:
             elif key.strip() == "plugin_path":
                 path_plugin = value.strip()
 
+# Check if python.exe exists
+if not os.path.exists(python_exe):
+    print(f"[ERROR] Python.exe not found at {python_exe}")
+    exit()
+
+# Check if the config file exists
+if not os.path.exists(path_plugin):
+    print(f"[ERROR] Shortcuts Plugin path does not exist at {path_plugin}")
+    exit()
+
 # Construct the full script path
 script_path = os.path.join(path_plugin, "Scripts", "DvResolve_Project_Shortcuts.py")
 
@@ -47,6 +57,11 @@ mode = "load"
 # Get the current script's filename
 script_name = os.path.basename(__file__)
 
-# Run the command
+#   Build the command
 command = [python_exe, script_path, mode, PROJECT_PATH, script_name]
-subprocess.run(command, shell=True)
+
+# Run the command
+try:
+    subprocess.run(command)
+except Exception as e:
+    print(f"[ERROR] Could not open shortcut: {e}")
