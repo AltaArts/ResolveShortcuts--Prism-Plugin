@@ -105,6 +105,9 @@ class Prism_ResolveShortcuts_Functions(object):
         if self.core.appPlugin.pluginName == "Resolve":
             #   Add RCL menu items only in Resolve
             self.core.registerCallback("openPBFileContextMenu", self.addShortcutItem, plugin=self)
+            #   Patches the Resolve Plugin openScene() Method
+            resolvePlugin = self.core.getPlugin("Resolve")
+            self.core.plugins.monkeyPatch(resolvePlugin.openScene, self.openScenePatch, self, force=True)
 
         #   Imports bridge script with the Resolve API
         try:
@@ -116,6 +119,17 @@ class Prism_ResolveShortcuts_Functions(object):
             logger.warning("Failed to import ResolveShortcuts module")
             self.core.popup("Failed to import ResolveShortcuts module")
             return
+
+
+    #   Patches the Resolve Plugin openScene() Method to Allow ResolveShortcuts Launching
+    def openScenePatch(self, origin, filepath):
+        #   If Double-clicked file is a Shortcut
+        if os.path.splitext(filepath)[1] == EXTENSION:
+            self.core.openFile(filepath)
+            return
+        
+        #   Call Original Method As-is
+        self.core.plugins.callUnpatchedFunction(self.core.appPlugin.openScene, origin, filepath)
 
 
     # if returns true, the plugin will be loaded by Prism
